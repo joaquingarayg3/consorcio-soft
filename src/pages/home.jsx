@@ -1,36 +1,31 @@
+import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
+import AppHeader from "../components/AppHeader";
 
 export default function Home() {
-  const { session, singOutUser } = useAuth();
+  const { session, perfil } = useAuth();
   const email = session?.user?.email;
-  const initial = email?.charAt(0).toUpperCase();
 
   return (
     <div className="min-h-dvh bg-stone-50">
-      <header className="flex items-center justify-between border-b border-stone-200 bg-white px-4 py-3 sm:px-6">
-        <span className="text-base font-bold text-stone-900 sm:text-lg">
-          Supervisión y Mantenimiento
-        </span>
-
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm font-medium text-stone-600 sm:inline">
-            {email}
-          </span>
-          <div
-            aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white"
-          >
-            {initial}
+      <AppHeader>
+        {perfil?.rol === "admin" && (
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/edificios"
+              className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
+            >
+              Edificios
+            </Link>
+            <Link
+              href="/admin/usuarios"
+              className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
+            >
+              Gestión de usuarios
+            </Link>
           </div>
-          <button
-            type="button"
-            onClick={() => singOutUser()}
-            className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 active:bg-stone-200"
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      </header>
+        )}
+      </AppHeader>
 
       <main className="flex flex-col items-center px-4 py-12 sm:px-6">
         <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 text-center shadow-sm sm:p-8">
