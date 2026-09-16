@@ -1,4 +1,5 @@
 import { Router, Switch, Route, Redirect } from "wouter";
+import { MotionConfig } from "motion/react";
 import Singin from "./components/singin";
 import Home from "./pages/home";
 import AdminUsuarios from "./pages/AdminUsuarios";
@@ -61,11 +62,13 @@ function AppRoutes() {
 function App() {
   return (
     <ErrorBoundary>
-      <AuthContextProvider>
-        <Router>
-          <AppRoutes />
-        </Router>
-      </AuthContextProvider>
+      <MotionConfig reducedMotion="user">
+        <AuthContextProvider>
+          <Router>
+            <AppRoutes />
+          </Router>
+        </AuthContextProvider>
+      </MotionConfig>
     </ErrorBoundary>
   );
 }

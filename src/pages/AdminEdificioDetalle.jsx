@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 function obtenerEdificio(id) {
   return supabase.from("edificio").select("*").eq("id", id).single();
@@ -30,7 +31,7 @@ const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 const hoy = () => new Date().toISOString().slice(0, 10);
 
 function asignacionActiva(a) {
-  return !a.fecha_hasta || a.fecha_hasta >= hoy();
+  return !a.fecha_hasta || a.fecha_hasta > hoy();
 }
 
 // Supabase puede devolver una relación embebida como objeto único en vez de
@@ -76,6 +77,7 @@ export default function AdminEdificioDetalle() {
   const [asignarError, setAsignarError] = useState(null);
 
   const [accionPendiente, setAccionPendiente] = useState(null);
+  const [confirmacion, setConfirmacion] = useState(null);
 
   const usuariosPorId = useMemo(
     () => Object.fromEntries(usuariosDisponibles.map((u) => [u.id, u])),
@@ -252,16 +254,19 @@ export default function AdminEdificioDetalle() {
     refrescarUnidades();
   }
 
+  async function handleConfirmarAccion() {
+    if (!confirmacion) return;
+    if (confirmacion.tipo === "eliminarUnidad") {
+      await handleEliminarUnidad(confirmacion.id);
+    } else if (confirmacion.tipo === "finalizarAsignacion") {
+      await handleFinalizarAsignacion(confirmacion.id);
+    }
+    setConfirmacion(null);
+  }
+
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader>
-        <Link
-          href="/admin/edificios"
-          className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
-        >
-          ← Volver
-        </Link>
-      </AppHeader>
+      <AppHeader backTo="/admin/edificios" />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         {edificioError && (
@@ -525,9 +530,9 @@ export default function AdminEdificioDetalle() {
 
             <div className="mt-4 space-y-3">
               {unidades?.map((u) => {
-                const asignacionesActivas = comoArray(
-                  u.unidad_usuarios,
-                ).filter(asignacionActiva);
+                const asignacionesActivas = comoArray(u.unidad_usuarios).filter(
+                  asignacionActiva,
+                );
                 return (
                   <div
                     key={u.id}
@@ -545,7 +550,9 @@ export default function AdminEdificioDetalle() {
                         {(u.superficie_m2 || u.porcentaje_fiscal) && (
                           <p className="text-xs text-stone-400">
                             {u.superficie_m2 ? `${u.superficie_m2} m²` : ""}
-                            {u.superficie_m2 && u.porcentaje_fiscal ? " · " : ""}
+                            {u.superficie_m2 && u.porcentaje_fiscal
+                              ? " · "
+                              : ""}
                             {u.porcentaje_fiscal
                               ? `${u.porcentaje_fiscal}% fiscal`
                               : ""}
@@ -566,7 +573,13 @@ export default function AdminEdificioDetalle() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleEliminarUnidad(u.id)}
+                          onClick={() =>
+                            setConfirmacion({
+                              tipo: "eliminarUnidad",
+                              id: u.id,
+                              nombre: u.identificador,
+                            })
+                          }
                           disabled={accionPendiente === u.id}
                           className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
@@ -604,7 +617,15 @@ export default function AdminEdificioDetalle() {
                               </span>
                               <button
                                 type="button"
-                                onClick={() => handleFinalizarAsignacion(a.id)}
+                                onClick={() =>
+                                  setConfirmacion({
+                                    tipo: "finalizarAsignacion",
+                                    id: a.id,
+                                    nombre: usuarioAsignado
+                                      ? `${usuarioAsignado.nombre} ${usuarioAsignado.apellido}`
+                                      : "este usuario",
+                                  })
+                                }
                                 disabled={accionPendiente === a.id}
                                 className="text-xs font-medium text-stone-500 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                               >
@@ -704,6 +725,26 @@ export default function AdminEdificioDetalle() {
           </>
         )}
       </main>
+
+      <ConfirmDialog
+        open={!!confirmacion}
+        title={
+          confirmacion?.tipo === "eliminarUnidad"
+            ? "¿Eliminar esta unidad?"
+            : "¿Finalizar esta asignación?"
+        }
+        message={
+          confirmacion?.tipo === "eliminarUnidad"
+            ? `Se va a eliminar la unidad "${confirmacion?.nombre}" junto con sus asignaciones asociadas. Esta acción no se puede deshacer.`
+            : `${confirmacion?.nombre} va a dejar de estar vinculado/a a esta unidad. Podés volver a asignarlo/a más adelante si hace falta.`
+        }
+        confirmLabel={
+          confirmacion?.tipo === "eliminarUnidad" ? "Eliminar" : "Finalizar"
+        }
+        pending={accionPendiente === confirmacion?.id}
+        onConfirm={handleConfirmarAccion}
+        onCancel={() => setConfirmacion(null)}
+      />
     </div>
   );
 }
