@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "wouter";
+import { useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 function obtenerPerfil(id) {
   return supabase.from("perfiles").select("*").eq("id", id).single();
@@ -37,6 +38,7 @@ export default function AdminUsuarioDetalle() {
   const [guardadoError, setGuardadoError] = useState(null);
   const [guardadoOk, setGuardadoOk] = useState(false);
   const [accionPendiente, setAccionPendiente] = useState(false);
+  const [confirmandoBaja, setConfirmandoBaja] = useState(false);
 
   useEffect(() => {
     async function cargar() {
@@ -95,16 +97,22 @@ export default function AdminUsuarioDetalle() {
     setPerfil((p) => ({ ...p, activo: activar }));
   }
 
+  function handleClickEstado() {
+    if (perfil.activo) {
+      setConfirmandoBaja(true);
+    } else {
+      handleCambiarEstado(true);
+    }
+  }
+
+  async function handleConfirmarBaja() {
+    await handleCambiarEstado(false);
+    setConfirmandoBaja(false);
+  }
+
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader>
-        <Link
-          href="/admin/usuarios"
-          className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
-        >
-          ← Volver
-        </Link>
-      </AppHeader>
+      <AppHeader backTo="/admin/usuarios" />
 
       <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
         {cargaError && (
@@ -158,7 +166,7 @@ export default function AdminUsuarioDetalle() {
 
               <button
                 type="button"
-                onClick={() => handleCambiarEstado(!perfil.activo)}
+                onClick={handleClickEstado}
                 disabled={accionPendiente}
                 className="mt-4 rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -293,6 +301,19 @@ export default function AdminUsuarioDetalle() {
           </>
         )}
       </main>
+
+      <ConfirmDialog
+        open={confirmandoBaja}
+        title="¿Dar de baja este usuario?"
+        message={
+          perfil &&
+          `${perfil.nombre} ${perfil.apellido} no va a poder iniciar sesión hasta que lo reactives.`
+        }
+        confirmLabel="Dar de baja"
+        pending={accionPendiente}
+        onConfirm={handleConfirmarBaja}
+        onCancel={() => setConfirmandoBaja(false)}
+      />
     </div>
   );
 }

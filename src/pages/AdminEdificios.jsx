@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
+import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
 
 function obtenerEdificios() {
   return supabase.from("edificio").select("*").order("nombre");
@@ -23,6 +24,7 @@ export default function AdminEdificios() {
   const [codigoPostal, setCodigoPostal] = useState("");
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [creadoOk, setCreadoOk] = useState(false);
 
   async function refrescarEdificios() {
     const { data, error } = await obtenerEdificios();
@@ -67,43 +69,43 @@ export default function AdminEdificios() {
       return;
     }
 
-    setNombre("");
-    setDireccion("");
-    setCiudad("");
-    setProvincia("");
-    setCodigoPostal("");
-    setFormAbierto(false);
     refrescarEdificios();
+    setCreadoOk(true);
+    setTimeout(() => {
+      setFormAbierto(false);
+      setCreadoOk(false);
+      setNombre("");
+      setDireccion("");
+      setCiudad("");
+      setProvincia("");
+      setCodigoPostal("");
+    }, 1400);
   }
 
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader>
-        <Link
-          href="/home"
-          className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
-        >
-          ← Volver
-        </Link>
-      </AppHeader>
+      <AppHeader backTo="/home" />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-semibold text-stone-900">Edificios</h1>
           <button
             type="button"
             onClick={() => setFormAbierto((v) => !v)}
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900"
+            className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
           >
             {formAbierto ? "Cancelar" : "+ Nuevo edificio"}
           </button>
         </div>
 
-        {formAbierto && (
-          <form
-            onSubmit={handleCrearEdificio}
-            className="mt-4 space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
-          >
+        <PopoverForm
+          open={formAbierto}
+          success={creadoOk}
+          successTitle="¡Edificio creado!"
+          successMessage={`${nombre} ya está disponible en la lista.`}
+          title="Nuevo edificio"
+        >
+          <form onSubmit={handleCrearEdificio} className="space-y-4">
             <div>
               <label htmlFor="nombre" className={labelClass}>
                 Nombre
@@ -176,13 +178,11 @@ export default function AdminEdificios() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={creando}
-              className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
-            >
-              {creando ? "Creando..." : "Crear edificio"}
-            </button>
+            <PopoverFormButton
+              loading={creando}
+              label="Crear edificio"
+              loadingLabel="Creando..."
+            />
 
             {formError && (
               <div
@@ -193,9 +193,54 @@ export default function AdminEdificios() {
               </div>
             )}
           </form>
-        )}
+        </PopoverForm>
 
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
+        {/* Mobile: tarjetas */}
+        <div className="mt-6 space-y-3 sm:hidden">
+          {edificios?.map((ed) => (
+            <Link
+              key={ed.id}
+              href={`/admin/edificios/${ed.id}`}
+              className="flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm transition-colors hover:border-amber-300 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            >
+              <div
+                aria-hidden="true"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <rect x="6" y="3" width="12" height="18" rx="1" />
+                  <path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
+                  <path d="M3 21h18" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-stone-900">
+                  {ed.nombre}
+                </p>
+                <p className="truncate text-sm text-stone-500">
+                  {ed.direccion}
+                  {ed.ciudad ? ` · ${ed.ciudad}` : ""}
+                </p>
+              </div>
+            </Link>
+          ))}
+          {edificios?.length === 0 && (
+            <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center text-sm text-stone-500 shadow-sm">
+              Todavía no hay edificios cargados.
+            </p>
+          )}
+        </div>
+
+        {/* sm+: tabla */}
+        <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm sm:block">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-stone-200 text-stone-500">

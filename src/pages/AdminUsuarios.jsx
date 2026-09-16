@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
+import ConfirmDialog from "../components/ConfirmDialog";
+import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
 
 function obtenerUsuarios() {
   return supabase
@@ -37,6 +39,7 @@ export default function AdminUsuarios() {
   const [credencialesCreadas, setCredencialesCreadas] = useState(null);
 
   const [accionPendiente, setAccionPendiente] = useState(null);
+  const [confirmandoBaja, setConfirmandoBaja] = useState(null);
 
   async function refrescarUsuarios() {
     const { data, error } = await obtenerUsuarios();
@@ -104,19 +107,26 @@ export default function AdminUsuarios() {
     refrescarUsuarios();
   }
 
+  function handleClickEstado(usuario) {
+    if (usuario.activo) {
+      setConfirmandoBaja(usuario);
+    } else {
+      handleCambiarEstado(usuario, true);
+    }
+  }
+
+  async function handleConfirmarBaja() {
+    if (!confirmandoBaja) return;
+    await handleCambiarEstado(confirmandoBaja, false);
+    setConfirmandoBaja(null);
+  }
+
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader>
-        <Link
-          href="/home"
-          className="text-sm font-medium text-amber-700 hover:text-amber-800 hover:underline"
-        >
-          ← Volver
-        </Link>
-      </AppHeader>
+      <AppHeader backTo="/home" />
 
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl font-semibold text-stone-900">
             Gestión de usuarios
           </h1>
@@ -126,7 +136,7 @@ export default function AdminUsuarios() {
               setFormAbierto((v) => !v);
               setCredencialesCreadas(null);
             }}
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900"
+            className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
           >
             {formAbierto ? "Cancelar" : "+ Nuevo usuario"}
           </button>
@@ -148,11 +158,8 @@ export default function AdminUsuarios() {
           </div>
         )}
 
-        {formAbierto && (
-          <form
-            onSubmit={handleCrearUsuario}
-            className="mt-4 space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
-          >
+        <PopoverForm open={formAbierto} title="Nuevo usuario">
+          <form onSubmit={handleCrearUsuario} className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-1">
                 <label htmlFor="nombre" className={labelClass}>
@@ -241,13 +248,11 @@ export default function AdminUsuarios() {
               </select>
             </div>
 
-            <button
-              type="submit"
-              disabled={creando}
-              className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
-            >
-              {creando ? "Creando..." : "Crear usuario"}
-            </button>
+            <PopoverFormButton
+              loading={creando}
+              label="Crear usuario"
+              loadingLabel="Creando..."
+            />
 
             {formError && (
               <div
@@ -258,9 +263,61 @@ export default function AdminUsuarios() {
               </div>
             )}
           </form>
-        )}
+        </PopoverForm>
 
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm">
+        {/* Mobile: tarjetas apiladas */}
+        <div className="mt-6 space-y-3 sm:hidden">
+          {usuarios?.map((u) => (
+            <div
+              key={u.id}
+              className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href={`/admin/usuarios/${u.id}`}
+                  className="min-w-0 flex-1"
+                >
+                  <p className="truncate font-semibold text-stone-900">
+                    {u.nombre} {u.apellido}
+                  </p>
+                  <p className="truncate text-sm text-stone-500">
+                    {u.email}
+                  </p>
+                </Link>
+                <span
+                  className={
+                    u.activo
+                      ? "shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
+                      : "shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
+                  }
+                >
+                  {u.activo ? "Activo" : "Inactivo"}
+                </span>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
+                <span className="text-xs font-medium text-stone-500">
+                  {u.rol === "admin" ? "Administrador" : "Usuario"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleClickEstado(u)}
+                  disabled={accionPendiente === u.id}
+                  className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {u.activo ? "Dar de baja" : "Reactivar"}
+                </button>
+              </div>
+            </div>
+          ))}
+          {usuarios?.length === 0 && (
+            <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center text-sm text-stone-500 shadow-sm">
+              Todavía no hay usuarios cargados.
+            </p>
+          )}
+        </div>
+
+        {/* sm+: tabla */}
+        <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm sm:block">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-stone-200 text-stone-500">
@@ -300,7 +357,7 @@ export default function AdminUsuarios() {
                   <td className="px-4 py-3">
                     <button
                       type="button"
-                      onClick={() => handleCambiarEstado(u, !u.activo)}
+                      onClick={() => handleClickEstado(u)}
                       disabled={accionPendiente === u.id}
                       className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
@@ -329,6 +386,19 @@ export default function AdminUsuarios() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={!!confirmandoBaja}
+        title="¿Dar de baja este usuario?"
+        message={
+          confirmandoBaja &&
+          `${confirmandoBaja.nombre} ${confirmandoBaja.apellido} no va a poder iniciar sesión hasta que lo reactives.`
+        }
+        confirmLabel="Dar de baja"
+        pending={accionPendiente === confirmandoBaja?.id}
+        onConfirm={handleConfirmarBaja}
+        onCancel={() => setConfirmandoBaja(null)}
+      />
     </div>
   );
 }
