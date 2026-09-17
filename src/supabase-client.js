@@ -1,17 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 
-const subapaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+  import.meta.env.VITE_SUPABASE_KEY;
 
-if (!subapaseUrl || !supabaseKey) {
-  console.warn(
-    "Supabase no está configurado aún. Agrega VITE_SUPABASE_URL y VITE_SUPABASE_KEY en tu archivo .env"
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    "Faltan VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en el archivo .env",
   );
 }
 
-const supabase = createClient(
-  subapaseUrl || "https://tu-proyecto.supabase.co",
-  supabaseKey || "tu-clave-publica-placeholder"
-);
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default supabase;

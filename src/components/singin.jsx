@@ -1,5 +1,5 @@
 import { useAuth } from "../contexts/auth-context/use-auth";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useActionState } from "react";
 import AuthLayout from "./AuthLayout";
 
@@ -30,7 +30,7 @@ export default function Singin() {
     <AuthLayout>
       <form
         action={submitAction}
-        aria-label="Sing in form"
+        aria-label="Formulario de inicio de sesión"
         aria-describedby="form-description"
         className="space-y-4"
       >
@@ -42,16 +42,6 @@ export default function Singin() {
             Ingresá tu correo electrónico y tu contraseña para continuar.
           </p>
         </div>
-
-        <p className="text-sm text-stone-500">
-          ¿No tenés una cuenta todavía?{" "}
-          <Link
-            href="/registro"
-            className="font-medium text-amber-700 hover:text-amber-800 hover:underline"
-          >
-            Solicitá la tuya.
-          </Link>
-        </p>
 
         <div>
           <label
