@@ -4,6 +4,7 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
+import { getAdminFunctionErrorMessage } from "../utils/supabase-errors";
 
 function obtenerUsuarios() {
   return supabase
@@ -75,7 +76,13 @@ export default function AdminUsuarios() {
     setCreando(false);
 
     if (error || data?.error) {
-      setFormError(data?.error || error.message);
+      setFormError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo crear el usuario. Revisá los datos e intentá nuevamente.",
+        ),
+      );
       return;
     }
 
@@ -100,7 +107,13 @@ export default function AdminUsuarios() {
     setAccionPendiente(null);
 
     if (error || data?.error) {
-      setListError(data?.error || error.message);
+      setListError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo actualizar el estado del usuario.",
+        ),
+      );
       return;
     }
     refrescarUsuarios();

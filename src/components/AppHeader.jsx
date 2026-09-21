@@ -3,9 +3,12 @@ import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   clearNotificationHistory,
+  clearUserNotifications,
   fetchClaimsForUser,
+  fetchUserNotifications,
   getNotificationHistory,
   getUnreadClaims,
+  markUserNotificationsAsRead,
   markClaimsAsViewed,
 } from "../services/claims";
 
@@ -24,6 +27,27 @@ export default function AppHeader({ backTo }) {
     async function loadNotifications() {
       if (!session?.user?.id) return;
       try {
+        const persistentNotifications = await fetchUserNotifications(
+          session.user.id,
+        );
+        if (persistentNotifications) {
+          const visibleNotifications = persistentNotifications
+            .filter((notification) => notification.reclamo)
+            .map((notification) => ({
+              ...notification.reclamo,
+              notificationId: notification.id,
+              leida: notification.leida,
+              fecha_creacion:
+                notification.reclamo.fecha_creacion || notification.creado_en,
+            }));
+          if (active) {
+            setNotifications(
+              visibleNotifications.filter((item) => !item.leida),
+            );
+            setNotificationHistory(visibleNotifications);
+          }
+          return;
+        }
         const claims = await fetchClaimsForUser({
           userId: session.user.id,
           userEmail: email || "",
@@ -36,7 +60,11 @@ export default function AppHeader({ backTo }) {
             getNotificationHistory(claims, session.user.id),
           );
         }
-      } catch {
+      } catch (notificationError) {
+        console.error(
+          "No se pudieron cargar las notificaciones",
+          notificationError,
+        );
         if (active) setNotifications([]);
       }
     }
@@ -61,10 +89,15 @@ export default function AppHeader({ backTo }) {
     const nextOpen = !notificationsOpen;
     setProfileOpen(false);
     setNotificationsOpen(nextOpen);
-    if (nextOpen) markClaimsAsViewed(session?.user?.id);
+    if (nextOpen) {
+      setNotifications([]);
+      markUserNotificationsAsRead(session?.user?.id).catch(() => null);
+      markClaimsAsViewed(session?.user?.id);
+    }
   }
 
   function handleClearHistory() {
+    clearUserNotifications(session?.user?.id).catch(() => null);
     clearNotificationHistory(session?.user?.id, allClaims);
     setNotificationHistory([]);
   }

@@ -7,6 +7,9 @@ const COMMENTS_STORAGE_KEY = "consorcio-soft-claim-comments-v1";
 const CLAIMS_BUCKET = "reclamos";
 const CLAIMS_VIEWED_KEY = "consorcio-soft-claims-viewed-v1";
 const CLAIMS_HISTORY_KEY = "consorcio-soft-claims-history-v1";
+const MAX_CLAIM_IMAGES = 5;
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const SELECT_FIELDS = `
   *,
   unidad_funcional:unidad_funcional_id ( id, identificador, piso ),
@@ -68,9 +71,20 @@ function readFileAsDataUrl(file) {
 
 async function uploadClaimImages(files, userId) {
   if (!files?.length) return [];
+  if (files.length > MAX_CLAIM_IMAGES) {
+    throw new Error("Podés adjuntar hasta 5 imágenes por reclamo.");
+  }
+  for (const file of files) {
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      throw new Error("Solo se permiten imágenes JPG, PNG o WEBP.");
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      throw new Error("Cada imagen debe pesar como máximo 5 MB.");
+    }
+  }
   if (isDemoMode()) return Promise.all(files.map(readFileAsDataUrl));
 
-  const uploadedUrls = [];
+  const uploadedPaths = [];
   for (const file of files) {
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
@@ -82,6 +96,9 @@ async function uploadClaimImages(files, userId) {
         contentType: file.type,
       });
     if (error) {
+      if (uploadedPaths.length) {
+        await supabase.storage.from(CLAIMS_BUCKET).remove(uploadedPaths);
+      }
       if (isMissingClaimsBucket(error)) {
         console.warn(
           "El bucket reclamos no existe; se guardarán las imágenes en el reclamo.",
@@ -90,10 +107,44 @@ async function uploadClaimImages(files, userId) {
       }
       throw error;
     }
-    const { data } = supabase.storage.from(CLAIMS_BUCKET).getPublicUrl(path);
-    uploadedUrls.push(data.publicUrl);
+    uploadedPaths.push(path);
   }
-  return uploadedUrls;
+  return uploadedPaths;
+}
+
+function storagePathFromImage(image) {
+  if (!image || image.startsWith("data:")) return null;
+  if (!image.startsWith("http")) return image;
+
+  const match = image.match(
+    /\/storage\/v1\/object\/(?:public|authenticated|sign)\/reclamos\/(.+?)(?:\?.*)?$/,
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function addSignedImageUrls(claims) {
+  const normalizedClaims = claims ?? [];
+  const paths = normalizedClaims.flatMap((claim) =>
+    (claim.imagen_urls || claim.image_urls || [])
+      .map(storagePathFromImage)
+      .filter(Boolean),
+  );
+  if (!paths.length) return normalizedClaims;
+
+  const { data, error } = await supabase.storage
+    .from(CLAIMS_BUCKET)
+    .createSignedUrls(paths, 3600);
+  if (error) throw error;
+
+  const signedUrls = new Map(
+    (data || []).map((item, index) => [paths[index], item.signedUrl]),
+  );
+  return normalizedClaims.map((claim) => ({
+    ...claim,
+    imagen_urls: (claim.imagen_urls || claim.image_urls || []).map(
+      (image) => signedUrls.get(storagePathFromImage(image)) || image,
+    ),
+  }));
 }
 
 function demoClaimsForUser() {
@@ -158,6 +209,40 @@ export function markClaimsAsViewed(userId) {
   window.dispatchEvent(new CustomEvent("claims-viewed"));
 }
 
+export async function fetchUserNotifications(userId) {
+  if (!userId || isDemoMode()) return null;
+  const { data, error } = await supabase
+    .from("usuario_notificaciones")
+    .select(
+      "id, reclamo_id, tipo, leida, ocultada, creado_en, reclamo:reclamo_id ( id, titulo, categoria, fecha_creacion )",
+    )
+    .eq("usuario_id", userId)
+    .eq("ocultada", false)
+    .order("creado_en", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function markUserNotificationsAsRead(userId) {
+  if (!userId || isDemoMode()) return;
+  const { error } = await supabase
+    .from("usuario_notificaciones")
+    .update({ leida: true })
+    .eq("usuario_id", userId)
+    .eq("leida", false);
+  if (error) throw error;
+}
+
+export async function clearUserNotifications(userId) {
+  if (!userId || isDemoMode()) return;
+  const { error } = await supabase
+    .from("usuario_notificaciones")
+    .update({ ocultada: true, leida: true })
+    .eq("usuario_id", userId)
+    .eq("ocultada", false);
+  if (error) throw error;
+}
+
 export async function fetchClaimsForUser({ userId, userEmail, isAdmin }) {
   if (isDemoMode()) return demoClaimsForUser(userId, userEmail, isAdmin);
 
@@ -168,7 +253,7 @@ export async function fetchClaimsForUser({ userId, userEmail, isAdmin }) {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+  return addSignedImageUrls(data);
 }
 
 export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
@@ -190,22 +275,20 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
     return data ?? [];
   }
 
-  const { data, error } = await supabase
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: activeAssignments, error: assignmentsError } = await supabase
     .from("unidad_usuarios")
-    .select("unidad_funcional:unidad_id ( id, identificador, piso )")
-    .eq("usuario_id", userId);
-  if (error) throw error;
-  const assignedUnits = (data ?? [])
+    .select(
+      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso )",
+    )
+    .eq("usuario_id", userId)
+    .lte("fecha_desde", today);
+  if (assignmentsError) throw assignmentsError;
+  const assignedUnits = (activeAssignments ?? [])
+    .filter((row) => !row.fecha_hasta || row.fecha_hasta >= today)
     .map((row) => row.unidad_funcional)
     .filter(Boolean);
-  if (assignedUnits.length > 0) return assignedUnits;
-
-  const fallback = await supabase
-    .from("unidad_funcional")
-    .select("id, identificador, piso")
-    .order("identificador");
-  if (fallback.error) throw fallback.error;
-  return fallback.data ?? [];
+  return assignedUnits;
 }
 
 export async function createClaim(claimData) {
@@ -252,8 +335,17 @@ export async function createClaim(claimData) {
     .insert([payload])
     .select(SELECT_FIELDS)
     .single();
-  if (error) throw error;
-  return data;
+  if (error) {
+    const uploadedPaths = imageUrls.filter(
+      (image) =>
+        image && !image.startsWith("data:") && !image.startsWith("http"),
+    );
+    if (uploadedPaths.length) {
+      await supabase.storage.from(CLAIMS_BUCKET).remove(uploadedPaths);
+    }
+    throw error;
+  }
+  return (await addSignedImageUrls([data]))[0];
 }
 
 export async function updateClaimStatus(claimId, status, adminId) {
@@ -280,7 +372,7 @@ export async function updateClaimStatus(claimId, status, adminId) {
     .select(SELECT_FIELDS)
     .single();
   if (error) throw error;
-  return data;
+  return (await addSignedImageUrls([data]))[0];
 }
 
 export async function updateClaimPriority(claimId, priority) {
@@ -302,7 +394,7 @@ export async function updateClaimPriority(claimId, priority) {
     .select(SELECT_FIELDS)
     .single();
   if (error) throw error;
-  return data;
+  return (await addSignedImageUrls([data]))[0];
 }
 
 export async function fetchClaimComments(claimId) {

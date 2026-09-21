@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { getAdminFunctionErrorMessage } from "../utils/supabase-errors";
 
 function obtenerPerfil(id) {
   return supabase.from("perfiles").select("*").eq("id", id).single();
@@ -91,7 +92,13 @@ export default function AdminUsuarioDetalle() {
     setAccionPendiente(false);
 
     if (error || data?.error) {
-      setGuardadoError(data?.error || error.message);
+      setGuardadoError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo actualizar el estado del usuario.",
+        ),
+      );
       return;
     }
     setPerfil((p) => ({ ...p, activo: activar }));

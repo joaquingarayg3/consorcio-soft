@@ -1,19 +1,58 @@
-# React + Vite
+# Consorcio Soft
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion para gestionar edificios, unidades, usuarios y reclamos de mantenimiento con React, Vite y Supabase.
 
-Currently, two official plugins are available:
+## Requisitos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20 o superior
+- pnpm
+- Un proyecto de Supabase
 
-## React Compiler
+## Instalacion
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+```bash
+pnpm install
+Copy-Item .env.example .env
+```
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+Completa `.env` con la URL y la clave publicable de tu proyecto Supabase. Nunca agregues `.env` al repositorio.
 
-## Expanding the ESLint configuration
+## Desarrollo
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+pnpm dev
+```
+
+La aplicacion queda disponible en `http://localhost:5173`.
+
+## Validacion y build
+
+```bash
+pnpm lint
+pnpm build
+pnpm preview
+```
+
+## Supabase
+
+La clave `service_role` se usa unicamente en la Edge Function `admin-users` y nunca debe exponerse en el frontend.
+
+Configura en la Edge Function:
+
+```text
+APP_ORIGIN=http://localhost:5173
+```
+
+En produccion, reemplaza ese valor por el dominio real de la aplicacion.
+
+Ejecuta las migraciones SQL de `supabase/migrations` en el SQL Editor o mediante Supabase CLI, respetando el orden de sus nombres.
+
+## Publicacion
+
+Antes de publicar:
+
+1. Verifica que `.env` no este incluido en Git.
+2. Ejecuta `pnpm lint` y `pnpm build`.
+3. Despliega la Edge Function `admin-users`.
+4. Ejecuta las migraciones de Supabase.
+5. Proba RLS con usuarios de distintos edificios y un usuario sin unidad.

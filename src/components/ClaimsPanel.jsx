@@ -209,6 +209,7 @@ export default function ClaimsPanel() {
 
   async function handleCreate(event) {
     event.preventDefault();
+    if (formError) return;
     setSaving(true);
     setFormError(null);
     try {
@@ -306,6 +307,7 @@ export default function ClaimsPanel() {
   const historyClaims = filteredClaims.filter(
     (claim) => (claim.estado || claim.status || "abierto") === "cerrado",
   );
+  const canCreateClaim = isAdmin || units.length > 0;
 
   return (
     <section className="w-full max-w-6xl" aria-labelledby="claims-title">
@@ -325,12 +327,24 @@ export default function ClaimsPanel() {
         </div>
         <button
           type="button"
-          onClick={() => setFormOpen(true)}
-          className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-800 active:bg-amber-900"
+          disabled={!canCreateClaim}
+          onClick={() => canCreateClaim && setFormOpen(true)}
+          title={
+            canCreateClaim
+              ? "Crear un nuevo reclamo"
+              : "Necesitás una unidad asignada para crear un reclamo"
+          }
+          className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
         >
           + Nuevo reclamo
         </button>
       </div>
+      {!isAdmin && units.length === 0 && (
+        <p className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Todavía no tenés una unidad asignada. Cuando el administrador la
+          vincule a tu usuario, vas a poder crear reclamos.
+        </p>
+      )}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           label="Total"
@@ -585,9 +599,29 @@ export default function ClaimsPanel() {
                   accept="image/jpeg,image/png,image/webp"
                   multiple
                   disabled={saving}
-                  onChange={(event) =>
-                    setImages(Array.from(event.target.files || []).slice(0, 5))
-                  }
+                  onChange={(event) => {
+                    const selectedImages = Array.from(event.target.files || []);
+                    const invalidImage = selectedImages.find(
+                      (image) =>
+                        !["image/jpeg", "image/png", "image/webp"].includes(
+                          image.type,
+                        ) || image.size > 5 * 1024 * 1024,
+                    );
+                    if (selectedImages.length > 5) {
+                      setFormError("Podés adjuntar hasta 5 imágenes.");
+                      setImages([]);
+                      return;
+                    }
+                    if (invalidImage) {
+                      setFormError(
+                        "Solo se permiten imágenes JPG, PNG o WEBP de hasta 5 MB.",
+                      );
+                      setImages([]);
+                      return;
+                    }
+                    setFormError(null);
+                    setImages(selectedImages);
+                  }}
                   className="block w-full rounded-lg border border-dashed border-stone-300 bg-stone-50 px-3 py-3 text-sm text-stone-600 file:mr-3 file:rounded-md file:border-0 file:bg-amber-100 file:px-3 file:py-1.5 file:font-medium file:text-amber-800"
                 />
                 {images.length > 0 && (
