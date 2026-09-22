@@ -34,12 +34,62 @@ export default function AdminUsuarios() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(generarContrasena());
   const [rol, setRol] = useState("user");
+  const [vinculo, setVinculo] = useState("propietario");
+  const [edificioId, setEdificioId] = useState("");
+  const [unidadId, setUnidadId] = useState("");
+  const [edificios, setEdificios] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [cargandoEdificios, setCargandoEdificios] = useState(false);
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState(null);
   const [credencialesCreadas, setCredencialesCreadas] = useState(null);
 
   const [accionPendiente, setAccionPendiente] = useState(null);
   const [confirmandoBaja, setConfirmandoBaja] = useState(null);
+
+  useEffect(() => {
+    async function cargarEdificios() {
+      setCargandoEdificios(true);
+      const { data, error } = await supabase
+        .from("edificio")
+        .select("id, nombre")
+        .order("nombre");
+      setCargandoEdificios(false);
+      if (error) {
+        setEdificios([]);
+        return;
+      }
+      setEdificios(data ?? []);
+    }
+    cargarEdificios();
+  }, []);
+
+  useEffect(() => {
+    async function cargarUnidades() {
+      if (!edificioId) {
+        setUnidades([]);
+        setUnidadId("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("unidad_funcional")
+        .select("id, identificador, piso, tipo")
+        .eq("edificio_id", edificioId)
+        .order("identificador");
+
+      if (error) {
+        setUnidades([]);
+        setUnidadId("");
+        return;
+      }
+
+      setUnidades(data ?? []);
+      setUnidadId("");
+    }
+
+    cargarUnidades();
+  }, [edificioId]);
 
   async function refrescarUsuarios() {
     const { data, error } = await obtenerUsuarios();
@@ -70,7 +120,16 @@ export default function AdminUsuarios() {
     setFormError(null);
 
     const { data, error } = await supabase.functions.invoke("admin-users", {
-      body: { action: "create", email, password, nombre, apellido, rol },
+      body: {
+        action: "create",
+        email,
+        password,
+        nombre,
+        apellido,
+        rol,
+        unidad_id: unidadId || undefined,
+        vinculo: vinculo || "propietario",
+      },
     });
 
     setCreando(false);
@@ -92,6 +151,10 @@ export default function AdminUsuarios() {
     setEmail("");
     setPassword(generarContrasena());
     setRol("user");
+    setVinculo("propietario");
+    setEdificioId("");
+    setUnidadId("");
+    setUnidades([]);
     setFormAbierto(false);
     refrescarUsuarios();
   }
@@ -243,6 +306,68 @@ export default function AdminUsuarios() {
                   Generar
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="edificio" className={labelClass}>
+                Edificio
+              </label>
+              <select
+                id="edificio"
+                value={edificioId}
+                onChange={(e) => setEdificioId(e.target.value)}
+                disabled={creando || cargandoEdificios}
+                className={inputClass}
+              >
+                <option value="">Sin edificio asignado</option>
+                {edificios.map((edificio) => (
+                  <option key={edificio.id} value={edificio.id}>
+                    {edificio.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="unidad" className={labelClass}>
+                Unidad
+              </label>
+              <select
+                id="unidad"
+                value={unidadId}
+                onChange={(e) => setUnidadId(e.target.value)}
+                disabled={creando || !edificioId || unidades.length === 0}
+                className={inputClass}
+              >
+                <option value="">
+                  {edificioId
+                    ? "Seleccionar unidad"
+                    : "Elegí un edificio primero"}
+                </option>
+                {unidades.map((unidad) => (
+                  <option key={unidad.id} value={unidad.id}>
+                    {unidad.identificador}{unidad.piso ? ` · Piso ${unidad.piso}` : ""} {unidad.tipo ? `(${unidad.tipo})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="vinculo" className={labelClass}>
+                Vínculo con la unidad
+              </label>
+              <select
+                id="vinculo"
+                value={vinculo}
+                onChange={(e) => setVinculo(e.target.value)}
+                disabled={creando}
+                className={inputClass}
+              >
+                <option value="propietario">Propietario</option>
+                <option value="inquilino">Inquilino</option>
+                <option value="ocupante">Ocupante</option>
+                <option value="otros">Otros</option>
+              </select>
             </div>
 
             <div>

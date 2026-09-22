@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import supabase from "../supabase-client";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   clearNotificationHistory,
@@ -21,6 +22,44 @@ export default function AppHeader({ backTo }) {
   const [notificationHistory, setNotificationHistory] = useState([]);
   const [profileOpen, setProfileOpen] = useState(false);
   const [allClaims, setAllClaims] = useState([]);
+  const [userAssignment, setUserAssignment] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUserAssignment() {
+      if (!session?.user?.id) {
+        setUserAssignment(null);
+        return;
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data, error } = await supabase
+        .from("unidad_usuarios")
+        .select(
+          "id, vinculo, fecha_desde, fecha_hasta, unidad_funcional(id, identificador, piso, edificio_id, edificio(nombre))",
+        )
+        .eq("usuario_id", session.user.id)
+        .lte("fecha_desde", today)
+        .order("fecha_desde", { ascending: false });
+
+      if (!active) return;
+      if (error) {
+        setUserAssignment(null);
+        return;
+      }
+
+      const activeAssignment = (data ?? []).find(
+        (row) => !row.fecha_hasta || row.fecha_hasta >= today,
+      );
+      setUserAssignment(activeAssignment ?? null);
+    }
+
+    loadUserAssignment();
+    return () => {
+      active = false;
+    };
+  }, [session?.user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -232,13 +271,77 @@ export default function AppHeader({ backTo }) {
             {initial}
           </button>
           {profileOpen && (
-            <div className="absolute right-0 top-12 z-50 w-56 rounded-xl border border-stone-200 bg-white p-4 shadow-xl">
-              <p className="font-semibold text-stone-900">
-                {perfil?.nombre || "Usuario"} {perfil?.apellido || ""}
-              </p>
-              <p className="mt-1 text-sm text-stone-500">
-                {perfil?.rol === "admin" ? "Administrador" : "Usuario"}
-              </p>
+            <div className="absolute right-0 top-12 z-50 w-72 rounded-xl border border-stone-200 bg-white p-4 shadow-xl">
+              <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white">
+                  {initial}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-stone-900">
+                    {perfil?.nombre || "Usuario"} {perfil?.apellido || ""}
+                  </p>
+                  <p className="truncate text-xs text-stone-500">{email}</p>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2 text-sm text-stone-600">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-stone-500">Rol</span>
+                  <span className="font-medium text-stone-800">
+                    {perfil?.rol === "admin" ? "Administrador" : "Usuario"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-stone-500">Estado</span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      perfil?.activo
+                        ? "bg-green-100 text-green-700"
+                        : "bg-stone-200 text-stone-600"
+                    }`}
+                  >
+                    {perfil?.activo ? "Activo" : "Inactivo"}
+                  </span>
+                </div>
+
+                {perfil?.telefono && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-stone-500">Teléfono</span>
+                    <span className="font-medium text-stone-800">
+                      {perfil.telefono}
+                    </span>
+                  </div>
+                )}
+
+                {userAssignment && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-stone-500">Unidad</span>
+                    <span className="text-right font-medium text-stone-800">
+                      {userAssignment.unidad_funcional?.identificador || "Sin unidad"}
+                    </span>
+                  </div>
+                )}
+
+                {userAssignment?.unidad_funcional?.edificio?.nombre && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-stone-500">Edificio</span>
+                    <span className="text-right font-medium text-stone-800">
+                      {userAssignment.unidad_funcional.edificio.nombre}
+                    </span>
+                  </div>
+                )}
+
+                {userAssignment?.vinculo && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-stone-500">Vínculo</span>
+                    <span className="font-medium capitalize text-stone-800">
+                      {userAssignment.vinculo}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => singOutUser()}

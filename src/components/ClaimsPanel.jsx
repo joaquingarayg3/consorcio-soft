@@ -36,7 +36,25 @@ function badgeClass(value) {
   return "bg-stone-100 text-stone-600";
 }
 
-function ClaimRow({ claim, isAdmin, pending, onPriorityChange }) {
+function priorityFilterClass(value, selected) {
+  const colors = {
+    todas: "bg-stone-900 text-white",
+    Baja: "bg-stone-100 text-stone-700",
+    Media: "bg-amber-100 text-amber-800",
+    Alta: "bg-orange-100 text-orange-800",
+    Urgente: "bg-red-100 text-red-700",
+  };
+  return selected
+    ? colors[value]
+    : "text-stone-600 hover:bg-stone-100";
+}
+
+function ClaimRow({
+  claim,
+  isAdmin,
+  pending,
+  onPriorityChange,
+}) {
   const [, navigate] = useLocation();
   const priority = claim.prioridad || claim.priority || "Media";
   const status = claim.estado || claim.status || "abierto";
@@ -94,17 +112,19 @@ function ClaimRow({ claim, isAdmin, pending, onPriorityChange }) {
           className="px-4 py-4 align-top"
           onClick={(event) => event.stopPropagation()}
         >
-          <select
-            aria-label="Cambiar prioridad"
-            value={priority}
-            disabled={pending}
-            onChange={(event) => onPriorityChange(claim.id, event.target.value)}
-            className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-amber-600 focus:outline-none"
-          >
-            {priorities.map((option) => (
-              <option key={option}>{option}</option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-2">
+            <select
+              aria-label="Cambiar prioridad"
+              value={priority}
+              disabled={pending}
+              onChange={(event) => onPriorityChange(claim.id, event.target.value)}
+              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-amber-600 focus:outline-none"
+            >
+              {priorities.map((option) => (
+                <option key={option}>{option}</option>
+              ))}
+            </select>
+          </div>
         </td>
       )}
     </tr>
@@ -127,7 +147,12 @@ function SummaryCard({ label, value, detail, alert = false }) {
   );
 }
 
-function ClaimsTable({ claims, isAdmin, pending, onPriorityChange }) {
+function ClaimsTable({
+  claims,
+  isAdmin,
+  pending,
+  onPriorityChange,
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left">
@@ -168,7 +193,7 @@ export default function ClaimsPanel() {
   const userEmail = session?.user?.email || "";
   const [claims, setClaims] = useState(null);
   const [units, setUnits] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("todos");
+  const [priorityFilter, setPriorityFilter] = useState("todas");
   const [categoryFilter, setCategoryFilter] = useState("todas");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -264,21 +289,26 @@ export default function ClaimsPanel() {
     [claims],
   );
   const counts = useMemo(
-    () => ({
-      total: claims?.length || 0,
-      activo: (claims || []).filter(
-        (claim) => (claim.estado || claim.status) === "abierto",
-      ).length,
-      curso: (claims || []).filter(
-        (claim) => (claim.estado || claim.status) === "en_curso",
-      ).length,
-      cerrado: (claims || []).filter(
-        (claim) => (claim.estado || claim.status) === "cerrado",
-      ).length,
-      urgente: (claims || []).filter(
-        (claim) => (claim.prioridad || claim.priority) === "Urgente",
-      ).length,
-    }),
+    () => {
+      const openClaims = (claims || []).filter(
+        (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
+      );
+      return {
+        total: openClaims.length,
+        activo: openClaims.filter(
+          (claim) => (claim.estado || claim.status) === "abierto",
+        ).length,
+        curso: openClaims.filter(
+          (claim) => (claim.estado || claim.status) === "en_curso",
+        ).length,
+        cerrado: (claims || []).filter(
+          (claim) => (claim.estado || claim.status) === "cerrado",
+        ).length,
+        urgente: openClaims.filter(
+          (claim) => (claim.prioridad || claim.priority) === "Urgente",
+        ).length,
+      };
+    },
     [claims],
   );
   const filteredClaims = useMemo(
@@ -290,7 +320,8 @@ export default function ClaimsPanel() {
           const text =
             `${titleOf(claim)} ${categoryValue} ${claim.unidad_funcional?.identificador || ""}`.toLowerCase();
           return (
-            (statusFilter === "todos" || status === statusFilter) &&
+            (priorityFilter === "todas" ||
+              (claim.prioridad || claim.priority || "Media") === priorityFilter) &&
             (categoryFilter === "todas" || categoryValue === categoryFilter) &&
             (!search.trim() || text.includes(search.trim().toLowerCase()))
           );
@@ -299,14 +330,17 @@ export default function ClaimsPanel() {
           (first, second) =>
             new Date(dateOf(second) || 0) - new Date(dateOf(first) || 0),
         ),
-    [categoryFilter, claims, search, statusFilter],
+    [categoryFilter, claims, priorityFilter, search],
   );
   const visibleClaims = filteredClaims.filter(
     (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
   );
-  const historyClaims = filteredClaims.filter(
-    (claim) => (claim.estado || claim.status || "abierto") === "cerrado",
-  );
+  const historyClaims = (claims || [])
+    .filter((claim) => (claim.estado || claim.status || "abierto") === "cerrado")
+    .sort(
+      (first, second) =>
+        new Date(dateOf(second) || 0) - new Date(dateOf(first) || 0),
+    );
   const canCreateClaim = isAdmin || units.length > 0;
 
   return (
@@ -349,7 +383,7 @@ export default function ClaimsPanel() {
         <SummaryCard
           label="Total"
           value={counts.total}
-          detail="reclamos registrados"
+          detail="reclamos activos"
         />
         <SummaryCard
           label="Activos"
@@ -362,10 +396,9 @@ export default function ClaimsPanel() {
           detail="en seguimiento"
         />
         <SummaryCard
-          label="Urgentes"
-          value={counts.urgente}
-          detail={`${counts.cerrado} cerrados`}
-          alert
+          label="Cerrados"
+          value={counts.cerrado}
+          detail="en el historial"
         />
       </div>
       <div className="mt-5 rounded-2xl border border-stone-200 bg-white shadow-sm">
@@ -378,16 +411,14 @@ export default function ClaimsPanel() {
             placeholder="Buscar reclamo, unidad..."
           />
           <div className="flex flex-wrap gap-1">
-            {["todos", "abierto", "en_curso"].map((option) => (
+            {["todas", "Baja", "Media", "Alta", "Urgente"].map((option) => (
               <button
                 key={option}
                 type="button"
-                onClick={() => setStatusFilter(option)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${statusFilter === option ? "bg-stone-900 text-white" : "text-stone-600 hover:bg-stone-100"}`}
+                onClick={() => setPriorityFilter(option)}
+                className={`rounded-lg px-3 py-2 text-xs font-semibold ${priorityFilterClass(option, priorityFilter === option)}`}
               >
-                {option === "todos"
-                  ? `Todos ${counts.activo + counts.curso}`
-                  : `${statusLabels[option]} ${option === "abierto" ? counts.activo : counts.curso}`}
+                {option === "todas" ? "Todas" : option}
               </button>
             ))}
           </div>

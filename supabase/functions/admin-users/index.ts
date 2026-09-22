@@ -88,6 +88,8 @@ Deno.serve(async (req) => {
       const nombre = String(body.nombre || "").trim();
       const apellido = String(body.apellido || "").trim();
       const rol = body.rol || "user";
+      const unidadId = typeof body.unidad_id === "string" ? body.unidad_id : null;
+      const vinculo = String(body.vinculo || "propietario").trim();
       if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         password.length < 8 ||
@@ -95,7 +97,8 @@ Deno.serve(async (req) => {
         nombre.length > 80 ||
         apellido.length < 1 ||
         apellido.length > 80 ||
-        !["user", "admin"].includes(rol)
+        !["user", "admin"].includes(rol) ||
+        !vinculo || vinculo.length > 40
       ) {
         return json({ error: "Datos de usuario inválidos" }, 400, req);
       }
@@ -119,6 +122,20 @@ Deno.serve(async (req) => {
         if (profileError) {
           await adminClient.auth.admin.deleteUser(data.user.id);
           return json({ error: "No se pudo configurar el rol" }, 500, req);
+        }
+      }
+
+      if (unidadId) {
+        const { error: unitError } = await adminClient.from("unidad_usuarios").insert({
+            usuario_id: data.user.id,
+            unidad_id: unidadId,
+            vinculo,
+            fecha_desde: new Date().toISOString().slice(0, 10),
+          });
+
+        if (unitError) {
+          await adminClient.auth.admin.deleteUser(data.user.id);
+          return json({ error: "No se pudo asignar la unidad al usuario" }, 500, req);
         }
       }
 

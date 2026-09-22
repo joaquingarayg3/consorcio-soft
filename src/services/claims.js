@@ -12,7 +12,7 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const SELECT_FIELDS = `
   *,
-  unidad_funcional:unidad_funcional_id ( id, identificador, piso ),
+  unidad_funcional:unidad_funcional_id ( id, identificador, piso, edificio_id ),
   reportante:reportante_id ( nombre, apellido, email ),
   cerrado_por:cerrado_por_id ( nombre, apellido )
 `;
@@ -209,18 +209,47 @@ export function markClaimsAsViewed(userId) {
   window.dispatchEvent(new CustomEvent("claims-viewed"));
 }
 
+async function fetchActiveBuildingIdsForUser(userId) {
+  if (!userId) return new Set();
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("unidad_usuarios")
+    .select(
+      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( edificio_id )",
+    )
+    .eq("usuario_id", userId)
+    .lte("fecha_desde", today);
+
+  if (error) throw error;
+
+  return new Set(
+    (data ?? [])
+      .filter((row) => !row.fecha_hasta || row.fecha_hasta >= today)
+      .map((row) => row.unidad_funcional?.edificio_id)
+      .filter(Boolean),
+  );
+}
+
 export async function fetchUserNotifications(userId) {
   if (!userId || isDemoMode()) return null;
+
   const { data, error } = await supabase
     .from("usuario_notificaciones")
     .select(
-      "id, reclamo_id, tipo, leida, ocultada, creado_en, reclamo:reclamo_id ( id, titulo, categoria, fecha_creacion )",
+      "id, reclamo_id, tipo, leida, ocultada, creado_en, reclamo:reclamo_id ( id, titulo, categoria, fecha_creacion, unidad_funcional:unidad_funcional_id ( edificio_id ) )",
     )
     .eq("usuario_id", userId)
     .eq("ocultada", false)
     .order("creado_en", { ascending: false });
   if (error) throw error;
-  return data ?? [];
+
+  const allowedBuildingIds = await fetchActiveBuildingIdsForUser(userId);
+  if (!allowedBuildingIds.size) return [];
+
+  return (data ?? []).filter(
+    (item) => allowedBuildingIds.has(item.reclamo?.unidad_funcional?.edificio_id),
+  );
 }
 
 export async function markUserNotificationsAsRead(userId) {
@@ -246,14 +275,28 @@ export async function clearUserNotifications(userId) {
 export async function fetchClaimsForUser({ userId, userEmail, isAdmin }) {
   if (isDemoMode()) return demoClaimsForUser(userId, userEmail, isAdmin);
 
-  let query = supabase
+  const query = supabase
     .from(TABLE_NAME)
     .select(SELECT_FIELDS)
     .order("fecha_creacion", { ascending: false });
 
   const { data, error } = await query;
   if (error) throw error;
-  return addSignedImageUrls(data);
+
+  if (isAdmin || !userId) {
+    return addSignedImageUrls(data ?? []);
+  }
+
+  const allowedBuildingIds = await fetchActiveBuildingIdsForUser(userId);
+  if (!allowedBuildingIds.size) {
+    return [];
+  }
+
+  return addSignedImageUrls(
+    (data ?? []).filter((claim) =>
+      allowedBuildingIds.has(claim.unidad_funcional?.edificio_id),
+    ),
+  );
 }
 
 export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
