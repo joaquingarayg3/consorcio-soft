@@ -91,7 +91,8 @@ export default function AdminUsuarioDetalle() {
       const unitId = activeAssignment?.unidad_funcional?.id;
       if (buildingId) setEdificioSeleccionado(buildingId);
       if (unitId) setUnidadSeleccionada(unitId);
-      if (activeAssignment?.vinculo) setVinculoSeleccionado(activeAssignment.vinculo);
+      if (activeAssignment?.vinculo)
+        setVinculoSeleccionado(activeAssignment.vinculo);
     }
     cargar();
   }, [id]);
@@ -170,12 +171,14 @@ export default function AdminUsuarioDetalle() {
         if (cerrarError) throw cerrarError;
       }
 
-      const { error: insertError } = await supabase.from("unidad_usuarios").insert({
-        usuario_id: id,
-        unidad_id: unidadSeleccionada,
-        vinculo: vinculoSeleccionado || "propietario",
-        fecha_desde: hoy(),
-      });
+      const { error: insertError } = await supabase
+        .from("unidad_usuarios")
+        .insert({
+          usuario_id: id,
+          unidad_id: unidadSeleccionada,
+          vinculo: vinculoSeleccionado || "propietario",
+          fecha_desde: hoy(),
+        });
 
       if (insertError) throw insertError;
 
@@ -385,7 +388,9 @@ export default function AdminUsuarioDetalle() {
               </h2>
 
               <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
-                Unidad actual: {findActiveAssignment(unidadesAsignadas)?.unidad_funcional?.identificador || "Sin unidad asignada"}
+                Unidad actual:{" "}
+                {findActiveAssignment(unidadesAsignadas)?.unidad_funcional
+                  ?.identificador || "Sin unidad asignada"}
               </div>
 
               <form onSubmit={handleAsignarUnidad} className="mt-4 space-y-4">

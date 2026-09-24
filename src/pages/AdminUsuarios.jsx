@@ -346,7 +346,9 @@ export default function AdminUsuarios() {
                 </option>
                 {unidades.map((unidad) => (
                   <option key={unidad.id} value={unidad.id}>
-                    {unidad.identificador}{unidad.piso ? ` · Piso ${unidad.piso}` : ""} {unidad.tipo ? `(${unidad.tipo})` : ""}
+                    {unidad.identificador}
+                    {unidad.piso ? ` · Piso ${unidad.piso}` : ""}{" "}
+                    {unidad.tipo ? `(${unidad.tipo})` : ""}
                   </option>
                 ))}
               </select>

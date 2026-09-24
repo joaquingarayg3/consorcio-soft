@@ -44,17 +44,10 @@ function priorityFilterClass(value, selected) {
     Alta: "bg-orange-100 text-orange-800",
     Urgente: "bg-red-100 text-red-700",
   };
-  return selected
-    ? colors[value]
-    : "text-stone-600 hover:bg-stone-100";
+  return selected ? colors[value] : "text-stone-600 hover:bg-stone-100";
 }
 
-function ClaimRow({
-  claim,
-  isAdmin,
-  pending,
-  onPriorityChange,
-}) {
+function ClaimRow({ claim, isAdmin, pending, onPriorityChange }) {
   const [, navigate] = useLocation();
   const priority = claim.prioridad || claim.priority || "Media";
   const status = claim.estado || claim.status || "abierto";
@@ -117,7 +110,9 @@ function ClaimRow({
               aria-label="Cambiar prioridad"
               value={priority}
               disabled={pending}
-              onChange={(event) => onPriorityChange(claim.id, event.target.value)}
+              onChange={(event) =>
+                onPriorityChange(claim.id, event.target.value)
+              }
               className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-amber-600 focus:outline-none"
             >
               {priorities.map((option) => (
@@ -147,12 +142,7 @@ function SummaryCard({ label, value, detail, alert = false }) {
   );
 }
 
-function ClaimsTable({
-  claims,
-  isAdmin,
-  pending,
-  onPriorityChange,
-}) {
+function ClaimsTable({ claims, isAdmin, pending, onPriorityChange }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left">
@@ -288,40 +278,37 @@ export default function ClaimsPanel() {
     ],
     [claims],
   );
-  const counts = useMemo(
-    () => {
-      const openClaims = (claims || []).filter(
-        (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
-      );
-      return {
-        total: openClaims.length,
-        activo: openClaims.filter(
-          (claim) => (claim.estado || claim.status) === "abierto",
-        ).length,
-        curso: openClaims.filter(
-          (claim) => (claim.estado || claim.status) === "en_curso",
-        ).length,
-        cerrado: (claims || []).filter(
-          (claim) => (claim.estado || claim.status) === "cerrado",
-        ).length,
-        urgente: openClaims.filter(
-          (claim) => (claim.prioridad || claim.priority) === "Urgente",
-        ).length,
-      };
-    },
-    [claims],
-  );
+  const counts = useMemo(() => {
+    const openClaims = (claims || []).filter(
+      (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
+    );
+    return {
+      total: openClaims.length,
+      activo: openClaims.filter(
+        (claim) => (claim.estado || claim.status) === "abierto",
+      ).length,
+      curso: openClaims.filter(
+        (claim) => (claim.estado || claim.status) === "en_curso",
+      ).length,
+      cerrado: (claims || []).filter(
+        (claim) => (claim.estado || claim.status) === "cerrado",
+      ).length,
+      urgente: openClaims.filter(
+        (claim) => (claim.prioridad || claim.priority) === "Urgente",
+      ).length,
+    };
+  }, [claims]);
   const filteredClaims = useMemo(
     () =>
       (claims || [])
         .filter((claim) => {
-          const status = claim.estado || claim.status || "abierto";
           const categoryValue = claim.categoria || claim.category || "General";
           const text =
             `${titleOf(claim)} ${categoryValue} ${claim.unidad_funcional?.identificador || ""}`.toLowerCase();
           return (
             (priorityFilter === "todas" ||
-              (claim.prioridad || claim.priority || "Media") === priorityFilter) &&
+              (claim.prioridad || claim.priority || "Media") ===
+                priorityFilter) &&
             (categoryFilter === "todas" || categoryValue === categoryFilter) &&
             (!search.trim() || text.includes(search.trim().toLowerCase()))
           );
@@ -336,7 +323,9 @@ export default function ClaimsPanel() {
     (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
   );
   const historyClaims = (claims || [])
-    .filter((claim) => (claim.estado || claim.status || "abierto") === "cerrado")
+    .filter(
+      (claim) => (claim.estado || claim.status || "abierto") === "cerrado",
+    )
     .sort(
       (first, second) =>
         new Date(dateOf(second) || 0) - new Date(dateOf(first) || 0),

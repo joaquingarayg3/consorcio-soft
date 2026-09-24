@@ -74,7 +74,8 @@ async function uploadClaimImages(files, userId) {
 
   const uploadedPaths = [];
   for (const file of files) {
-    const extension = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
+    const extension =
+      file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage
       .from(CLAIMS_BUCKET)
@@ -253,8 +254,8 @@ export async function fetchUserNotifications(userId) {
   const allowedBuildingIds = await fetchActiveBuildingIdsForUser(userId);
   if (!allowedBuildingIds.size) return [];
 
-  return (data ?? []).filter(
-    (item) => allowedBuildingIds.has(item.reclamo?.unidad_funcional?.edificio_id),
+  return (data ?? []).filter((item) =>
+    allowedBuildingIds.has(item.reclamo?.unidad_funcional?.edificio_id),
   );
 }
 

@@ -45,7 +45,31 @@ APP_ORIGIN=http://localhost:5173
 
 En produccion, reemplaza ese valor por el dominio real de la aplicacion.
 
-Ejecuta las migraciones SQL de `supabase/migrations` en el SQL Editor o mediante Supabase CLI, respetando el orden de sus nombres.
+Las migraciones de `supabase/migrations` se aplican en el orden de su número de versión:
+
+| Migración | Qué hace |
+| --- | --- |
+| `20260924120000_seguridad_rls.sql` | Corrige la escalada a admin en `perfiles` y define las políticas RLS de todas las tablas y del bucket `reclamos`. |
+| `20260924120100_permisos_tablas.sql` | Quita todo acceso sin sesión (`anon`) y `TRUNCATE`; habilita crear reclamos. |
+| `20260924120200_funciones_privadas.sql` | Mueve las funciones auxiliares de RLS al esquema `private`, que la API no expone. |
+
+Para aplicar migraciones nuevas:
+
+```bash
+npx supabase db push --linked
+```
+
+Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, `reclamos`, `reclamo_comentarios`) se crearon desde el panel y no tienen migración propia.
+
+### Reglas de seguridad
+
+- El registro público está desactivado: los usuarios los crea un admin desde la Edge Function `admin-users`.
+- Un usuario ve los reclamos de los edificios donde tiene una unidad vigente, y solo su propio perfil.
+- Un usuario solo puede crear reclamos a su nombre, en su unidad, abiertos y sin prioridad `Urgente`.
+- Cambiar estado o prioridad, borrar reclamos, y administrar edificios, unidades y usuarios es solo para admins.
+- Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
+
+`supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.
 
 ## Publicacion
 

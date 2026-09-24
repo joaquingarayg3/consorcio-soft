@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
       const apellido = String(body.apellido || "").trim();
       const rol = body.rol || "user";
       const unidadId =
-        typeof body.unidad_id === "string" && body.unidad_id ? body.unidad_id : null;
+        typeof body.unidad_id === "string" && body.unidad_id
+          ? body.unidad_id
+          : null;
       const vinculo = String(body.vinculo || "propietario").trim();
       if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
@@ -107,7 +109,8 @@ Deno.serve(async (req) => {
         apellido.length < 1 ||
         apellido.length > 80 ||
         !["user", "admin"].includes(rol) ||
-        !vinculo || vinculo.length > 40
+        !vinculo ||
+        vinculo.length > 40
       ) {
         return json({ error: "Datos de usuario inválidos" }, 400, req);
       }
@@ -135,7 +138,9 @@ Deno.serve(async (req) => {
       }
 
       if (unidadId) {
-        const { error: unitError } = await adminClient.from("unidad_usuarios").insert({
+        const { error: unitError } = await adminClient
+          .from("unidad_usuarios")
+          .insert({
             usuario_id: data.user.id,
             unidad_id: unidadId,
             vinculo,
@@ -144,7 +149,11 @@ Deno.serve(async (req) => {
 
         if (unitError) {
           await adminClient.auth.admin.deleteUser(data.user.id);
-          return json({ error: "No se pudo asignar la unidad al usuario" }, 500, req);
+          return json(
+            { error: "No se pudo asignar la unidad al usuario" },
+            500,
+            req,
+          );
         }
       }
 
@@ -157,7 +166,11 @@ Deno.serve(async (req) => {
         return json({ error: "Falta el id del usuario" }, 400, req);
       }
       if (action === "deactivate" && userId === user.id) {
-        return json({ error: "No podés dar de baja tu propia cuenta" }, 400, req);
+        return json(
+          { error: "No podés dar de baja tu propia cuenta" },
+          400,
+          req,
+        );
       }
 
       const banDuration = action === "deactivate" ? "876000h" : "none";

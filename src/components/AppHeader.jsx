@@ -318,7 +318,8 @@ export default function AppHeader({ backTo }) {
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-stone-500">Unidad</span>
                     <span className="text-right font-medium text-stone-800">
-                      {userAssignment.unidad_funcional?.identificador || "Sin unidad"}
+                      {userAssignment.unidad_funcional?.identificador ||
+                        "Sin unidad"}
                     </span>
                   </div>
                 )}
