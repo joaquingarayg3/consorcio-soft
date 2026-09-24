@@ -251,12 +251,9 @@ export async function fetchUserNotifications(userId) {
     .order("creado_en", { ascending: false });
   if (error) throw error;
 
-  const allowedBuildingIds = await fetchActiveBuildingIdsForUser(userId);
-  if (!allowedBuildingIds.size) return [];
-
-  return (data ?? []).filter((item) =>
-    allowedBuildingIds.has(item.reclamo?.unidad_funcional?.edificio_id),
-  );
+  // RLS solo devuelve el reclamo si el usuario puede verlo (admin, autor o
+  // vecino del edificio); si no, llega null y la notificación se descarta.
+  return (data ?? []).filter((item) => item.reclamo);
 }
 
 export async function markUserNotificationsAsRead(userId) {
