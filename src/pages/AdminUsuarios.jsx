@@ -4,7 +4,10 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
-import { getAdminFunctionErrorMessage } from "../utils/supabase-errors";
+import {
+  getAdminFunctionErrorMessage,
+  mensajeDeError,
+} from "../utils/supabase-errors";
 
 function obtenerUsuarios() {
   return supabase
@@ -94,7 +97,7 @@ export default function AdminUsuarios() {
   async function refrescarUsuarios() {
     const { data, error } = await obtenerUsuarios();
     if (error) {
-      setListError(error.message);
+      setListError(mensajeDeError(error));
       return;
     }
     setListError(null);
@@ -105,7 +108,7 @@ export default function AdminUsuarios() {
     async function cargarInicial() {
       const { data, error } = await obtenerUsuarios();
       if (error) {
-        setListError(error.message);
+        setListError(mensajeDeError(error));
         return;
       }
       setListError(null);

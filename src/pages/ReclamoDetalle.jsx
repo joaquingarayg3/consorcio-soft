@@ -8,6 +8,7 @@ import {
   fetchClaimComments,
   updateClaim,
 } from "../services/claims";
+import { mensajeDeError } from "../utils/supabase-errors";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50";
@@ -58,7 +59,7 @@ export default function ReclamoDetalle() {
       }
       setComments(claimComments);
     } catch (loadError) {
-      setError(loadError.message || "No se pudo cargar el reclamo.");
+      setError(mensajeDeError(loadError, "No se pudo cargar el reclamo."));
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,9 @@ export default function ReclamoDetalle() {
       setComment("");
       setError(null);
     } catch (commentError) {
-      setError(commentError.message || "No se pudo agregar el comentario.");
+      setError(
+        mensajeDeError(commentError, "No se pudo agregar el comentario."),
+      );
     } finally {
       setSaving(false);
     }
@@ -112,7 +115,9 @@ export default function ReclamoDetalle() {
       setClaim((current) => ({ ...current, ...updated }));
       setError(null);
     } catch (saveError) {
-      setError(saveError.message || "No se pudieron guardar los cambios.");
+      setError(
+        mensajeDeError(saveError, "No se pudieron guardar los cambios."),
+      );
     } finally {
       setSaving(false);
     }

@@ -3,7 +3,10 @@ import { useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { getAdminFunctionErrorMessage } from "../utils/supabase-errors";
+import {
+  getAdminFunctionErrorMessage,
+  mensajeDeError,
+} from "../utils/supabase-errors";
 import { asignacionVigente, hoy } from "../utils/fechas";
 
 function obtenerPerfil(id) {
@@ -70,7 +73,7 @@ export default function AdminUsuarioDetalle() {
         await Promise.all([obtenerPerfil(id), obtenerUnidadesAsignadas(id)]);
 
       if (perfilError) {
-        setCargaError(perfilError.message);
+        setCargaError(mensajeDeError(perfilError));
         setPerfil(null);
         return;
       }
@@ -137,7 +140,7 @@ export default function AdminUsuarioDetalle() {
     setGuardando(false);
 
     if (error) {
-      setGuardadoError(error.message);
+      setGuardadoError(mensajeDeError(error));
       return;
     }
     setPerfil(data);
@@ -189,7 +192,9 @@ export default function AdminUsuarioDetalle() {
       const { data: unidadesData } = await obtenerUnidadesAsignadas(id);
       setUnidadesAsignadas(unidadesData || []);
     } catch (error) {
-      setErrorAsignacion(error.message || "No se pudo modificar la unidad.");
+      setErrorAsignacion(
+        mensajeDeError(error, "No se pudo modificar la unidad."),
+      );
     } finally {
       setAsignandoUnidad(false);
     }

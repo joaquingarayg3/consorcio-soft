@@ -4,6 +4,7 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { asignacionVigente, hoy } from "../utils/fechas";
+import { mensajeDeError } from "../utils/supabase-errors";
 
 function obtenerEdificio(id) {
   return supabase.from("edificio").select("*").eq("id", id).single();
@@ -100,7 +101,7 @@ export default function AdminEdificioDetalle() {
       ]);
 
       if (edError) {
-        setEdificioError(edError.message);
+        setEdificioError(mensajeDeError(edError));
         setEdificio(null);
         return;
       }
@@ -111,7 +112,7 @@ export default function AdminEdificioDetalle() {
       setProvincia(edificioData.provincia || "");
       setCodigoPostal(edificioData.codigo_postal || "");
 
-      if (unError) setUnidadesError(unError.message);
+      if (unError) setUnidadesError(mensajeDeError(unError));
       setUnidades(unidadesData || []);
       setUsuariosDisponibles(usuariosData || []);
     }
@@ -121,7 +122,7 @@ export default function AdminEdificioDetalle() {
   async function refrescarUnidades() {
     const { data, error } = await obtenerUnidades(id);
     if (error) {
-      setUnidadesError(error.message);
+      setUnidadesError(mensajeDeError(error));
       return;
     }
     setUnidadesError(null);
@@ -140,7 +141,7 @@ export default function AdminEdificioDetalle() {
         nombre,
         direccion,
         ciudad: ciudad || null,
-        provincia: provincia || null,
+        provincia: provincia.trim(),
         codigo_postal: codigoPostal || null,
       })
       .eq("id", id)
@@ -150,7 +151,7 @@ export default function AdminEdificioDetalle() {
     setGuardandoEdificio(false);
 
     if (error) {
-      setEdificioGuardadoError(error.message);
+      setEdificioGuardadoError(mensajeDeError(error));
       return;
     }
     setEdificio(data);
@@ -177,13 +178,13 @@ export default function AdminEdificioDetalle() {
       piso: piso || null,
       tipo,
       superficie_m2: superficieM2 ? Number(superficieM2) : null,
-      porcentaje_fiscal: porcentajeFiscal ? Number(porcentajeFiscal) : null,
+      porcentaje_fiscal: Number(porcentajeFiscal || 0),
     });
 
     setCreandoUnidad(false);
 
     if (error) {
-      setUnidadFormError(error.message);
+      setUnidadFormError(mensajeDeError(error));
       return;
     }
 
@@ -205,7 +206,7 @@ export default function AdminEdificioDetalle() {
     setAccionPendiente(null);
 
     if (error) {
-      setUnidadesError(error.message);
+      setUnidadesError(mensajeDeError(error));
       return;
     }
     refrescarUnidades();
@@ -226,7 +227,7 @@ export default function AdminEdificioDetalle() {
     setAsignando(false);
 
     if (error) {
-      setAsignarError(error.message);
+      setAsignarError(mensajeDeError(error));
       return;
     }
 
@@ -245,7 +246,7 @@ export default function AdminEdificioDetalle() {
     setAccionPendiente(null);
 
     if (error) {
-      setUnidadesError(error.message);
+      setUnidadesError(mensajeDeError(error));
       return;
     }
     refrescarUnidades();
@@ -340,6 +341,7 @@ export default function AdminEdificioDetalle() {
                   <input
                     id="provincia"
                     type="text"
+                    required
                     value={provincia}
                     onChange={(e) => setProvincia(e.target.value)}
                     disabled={guardandoEdificio}
@@ -495,6 +497,7 @@ export default function AdminEdificioDetalle() {
                     <input
                       id="porcentajeFiscal"
                       type="number"
+                      required
                       min="0"
                       max={disponiblePorcentajeFiscal}
                       step="0.01"

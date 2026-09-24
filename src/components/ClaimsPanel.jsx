@@ -8,6 +8,7 @@ import {
   updateClaimPriority,
 } from "../services/claims";
 import { PopoverFormButton } from "./PopoverForm";
+import { mensajeDeError } from "../utils/supabase-errors";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50";
@@ -211,7 +212,9 @@ export default function ClaimsPanel() {
       setUnits(myUnits);
       setError(null);
     } catch (loadError) {
-      setError(loadError.message || "No se pudieron cargar los reclamos.");
+      setError(
+        mensajeDeError(loadError, "No se pudieron cargar los reclamos."),
+      );
       setClaims([]);
     } finally {
       setLoading(false);
@@ -256,7 +259,7 @@ export default function ClaimsPanel() {
       setFormOpen(false);
       setClaims((current) => [created, ...(current || [])]);
     } catch (createError) {
-      setFormError(createError.message || "No se pudo crear el reclamo.");
+      setFormError(mensajeDeError(createError, "No se pudo crear el reclamo."));
     } finally {
       setSaving(false);
     }
@@ -273,7 +276,9 @@ export default function ClaimsPanel() {
       );
       setError(null);
     } catch (actionError) {
-      setError(actionError.message || "No se pudo actualizar la prioridad.");
+      setError(
+        mensajeDeError(actionError, "No se pudo actualizar la prioridad."),
+      );
     } finally {
       setSaving(false);
     }

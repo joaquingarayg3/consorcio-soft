@@ -54,6 +54,7 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20260924120200_funciones_privadas.sql` | Mueve las funciones auxiliares de RLS al esquema `private`, que la API no expone. |
 | `20260924120300_asignaciones_vigentes.sql` | `fecha_hasta` de una asignación pasa a ser exclusiva (finalizar hoy corta el acceso en el acto) y permite reasignar a alguien a una unidad que ya tuvo. |
 | `20260924120400_rendimiento_rls.sql` | Índices en claves foráneas y `auth.uid()` evaluado una vez por consulta. |
+| `20260924120500_reclamos_select_fila.sql` | La lectura de reclamos se evalúa con la propia fila: permite que un usuario común cree reclamos. |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
 
