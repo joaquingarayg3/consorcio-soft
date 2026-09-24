@@ -4,10 +4,9 @@ import AppHeader from "../components/AppHeader";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   addClaimComment,
+  fetchClaimById,
   fetchClaimComments,
-  fetchClaimsForUser,
-  updateClaimPriority,
-  updateClaimStatus,
+  updateClaim,
 } from "../services/claims";
 
 const inputClass =
@@ -46,11 +45,10 @@ export default function ReclamoDetalle() {
   const loadDetail = useCallback(async () => {
     try {
       setLoading(true);
-      const [claims, claimComments] = await Promise.all([
-        fetchClaimsForUser({ userId, userEmail, isAdmin }),
+      const [foundClaim, claimComments] = await Promise.all([
+        fetchClaimById(id),
         fetchClaimComments(id),
       ]);
-      const foundClaim = claims.find((item) => item.id === id) || null;
       setClaim(foundClaim);
       if (foundClaim) {
         setDraftStatus(claimStatus(foundClaim));
@@ -64,7 +62,7 @@ export default function ReclamoDetalle() {
     } finally {
       setLoading(false);
     }
-  }, [id, isAdmin, userEmail, userId]);
+  }, [id]);
 
   useEffect(() => {
     async function loadInitialDetail() {
@@ -99,21 +97,19 @@ export default function ReclamoDetalle() {
   }
 
   async function handleSaveChanges() {
+    if (draftStatus === status && draftPriority === priority) return;
     setSaving(true);
     try {
-      let updated = claim;
-      if (draftStatus !== status) {
-        updated = await updateClaimStatus(id, draftStatus, userId);
-      }
-      if (draftPriority !== priority) {
-        updated = await updateClaimPriority(id, draftPriority);
-      }
-      setClaim((current) => ({
-        ...current,
-        ...updated,
-        estado: draftStatus,
-        prioridad: draftPriority,
-      }));
+      const updated = await updateClaim(
+        id,
+        {
+          status: draftStatus,
+          priority: draftPriority,
+          previousStatus: status,
+        },
+        userId,
+      );
+      setClaim((current) => ({ ...current, ...updated }));
       setError(null);
     } catch (saveError) {
       setError(saveError.message || "No se pudieron guardar los cambios.");

@@ -203,24 +203,30 @@ export default function ClaimsPanel() {
   const loadClaims = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await fetchClaimsForUser({ userId, userEmail, isAdmin });
+      const [data, myUnits] = await Promise.all([
+        fetchClaimsForUser(),
+        fetchMyUnidadesFuncionales(userId, isAdmin),
+      ]);
       setClaims(data);
+      setUnits(myUnits);
       setError(null);
-      setUnits(await fetchMyUnidadesFuncionales(userId, isAdmin));
     } catch (loadError) {
       setError(loadError.message || "No se pudieron cargar los reclamos.");
       setClaims([]);
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, userEmail, userId]);
+  }, [isAdmin, userId]);
 
+  // perfil undefined = todavía no sabemos si es admin: esperar evita cargar
+  // todo una vez como usuario común y otra como admin.
+  const perfilListo = perfil !== undefined;
   useEffect(() => {
     async function loadInitialClaims() {
-      if (userId) await loadClaims();
+      if (userId && perfilListo) await loadClaims();
     }
     loadInitialClaims();
-  }, [loadClaims, userId]);
+  }, [loadClaims, perfilListo, userId]);
 
   async function handleCreate(event) {
     event.preventDefault();
@@ -229,7 +235,7 @@ export default function ClaimsPanel() {
     setFormError(null);
     try {
       const unit = units.find((item) => item.id === unitId) || null;
-      await createClaim({
+      const created = await createClaim({
         title,
         category,
         priority,
@@ -248,7 +254,7 @@ export default function ClaimsPanel() {
       setDescription("");
       setImages([]);
       setFormOpen(false);
-      await loadClaims();
+      setClaims((current) => [created, ...(current || [])]);
     } catch (createError) {
       setFormError(createError.message || "No se pudo crear el reclamo.");
     } finally {
@@ -259,8 +265,13 @@ export default function ClaimsPanel() {
   async function handlePriorityChange(claimId, nextPriority) {
     setSaving(true);
     try {
-      await updateClaimPriority(claimId, nextPriority);
-      await loadClaims();
+      const updated = await updateClaimPriority(claimId, nextPriority);
+      setClaims((current) =>
+        (current || []).map((claim) =>
+          claim.id === claimId ? { ...claim, ...updated } : claim,
+        ),
+      );
+      setError(null);
     } catch (actionError) {
       setError(actionError.message || "No se pudo actualizar la prioridad.");
     } finally {

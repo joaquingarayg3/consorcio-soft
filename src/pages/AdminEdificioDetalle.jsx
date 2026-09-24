@@ -3,6 +3,7 @@ import { Link, useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
+import { asignacionVigente, hoy } from "../utils/fechas";
 
 function obtenerEdificio(id) {
   return supabase.from("edificio").select("*").eq("id", id).single();
@@ -28,11 +29,7 @@ function obtenerUsuarios() {
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
-const hoy = () => new Date().toISOString().slice(0, 10);
-
-function asignacionActiva(a) {
-  return !a.fecha_hasta || a.fecha_hasta > hoy();
-}
+const asignacionActiva = (a) => asignacionVigente(a);
 
 // Supabase puede devolver una relación embebida como objeto único en vez de
 // array si detecta (a veces por error, ej. una restricción UNIQUE mal puesta

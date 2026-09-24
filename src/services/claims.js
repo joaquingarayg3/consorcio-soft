@@ -1,5 +1,6 @@
 import supabase from "../supabase-client";
 import { getStoredClaims, saveStoredClaims } from "../utils/claims";
+import { asignacionVigente, hoy } from "../utils/fechas";
 
 const TABLE_NAME = "reclamos";
 const COMMENTS_TABLE_NAME = "reclamo_comentarios";
@@ -197,45 +198,33 @@ export function getNotificationHistory(claims, userId) {
     );
 }
 
+// Estas dos funciones solo aplican al modo demo: con Supabase las
+// notificaciones viven en la base (usuario_notificaciones).
 export function clearNotificationHistory(userId, claims) {
-  if (!userId) return;
+  if (!userId || !isDemoMode()) return;
   const state = readNotificationState();
   state[userId] = {
     ...(state[userId] || {}),
     hiddenIds: (claims || []).map((claim) => claim.id),
   };
-  localStorage.setItem(CLAIMS_HISTORY_KEY, JSON.stringify(state));
+  try {
+    localStorage.setItem(CLAIMS_HISTORY_KEY, JSON.stringify(state));
+  } catch {
+    // Almacenamiento bloqueado (modo incógnito): no hay historial que guardar.
+  }
   window.dispatchEvent(new CustomEvent("notifications-cleared"));
 }
 
 export function markClaimsAsViewed(userId) {
-  if (!userId) return;
+  if (!userId || !isDemoMode()) return;
   const viewed = readClaimsViewed();
   viewed[userId] = Date.now();
-  localStorage.setItem(CLAIMS_VIEWED_KEY, JSON.stringify(viewed));
+  try {
+    localStorage.setItem(CLAIMS_VIEWED_KEY, JSON.stringify(viewed));
+  } catch {
+    // Almacenamiento bloqueado (modo incógnito).
+  }
   window.dispatchEvent(new CustomEvent("claims-viewed"));
-}
-
-async function fetchActiveBuildingIdsForUser(userId) {
-  if (!userId) return new Set();
-
-  const today = new Date().toISOString().slice(0, 10);
-  const { data, error } = await supabase
-    .from("unidad_usuarios")
-    .select(
-      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( edificio_id )",
-    )
-    .eq("usuario_id", userId)
-    .lte("fecha_desde", today);
-
-  if (error) throw error;
-
-  return new Set(
-    (data ?? [])
-      .filter((row) => !row.fecha_hasta || row.fecha_hasta >= today)
-      .map((row) => row.unidad_funcional?.edificio_id)
-      .filter(Boolean),
-  );
 }
 
 export async function fetchUserNotifications(userId) {
@@ -276,31 +265,33 @@ export async function clearUserNotifications(userId) {
   if (error) throw error;
 }
 
-export async function fetchClaimsForUser({ userId, userEmail, isAdmin }) {
-  if (isDemoMode()) return demoClaimsForUser(userId, userEmail, isAdmin);
+// RLS ya limita los reclamos a los que el usuario puede ver (admin, autor o
+// vecino del edificio), así que no hace falta filtrar de nuevo acá.
+// La lista no muestra fotos: no se firman sus URLs.
+export async function fetchClaimsForUser() {
+  if (isDemoMode()) return demoClaimsForUser();
 
-  const query = supabase
+  const { data, error } = await supabase
     .from(TABLE_NAME)
     .select(SELECT_FIELDS)
     .order("fecha_creacion", { ascending: false });
-
-  const { data, error } = await query;
   if (error) throw error;
+  return data ?? [];
+}
 
-  if (isAdmin || !userId) {
-    return addSignedImageUrls(data ?? []);
+export async function fetchClaimById(claimId) {
+  if (isDemoMode()) {
+    return getStoredClaims().find((claim) => claim.id === claimId) || null;
   }
 
-  const allowedBuildingIds = await fetchActiveBuildingIdsForUser(userId);
-  if (!allowedBuildingIds.size) {
-    return [];
-  }
-
-  return addSignedImageUrls(
-    (data ?? []).filter((claim) =>
-      allowedBuildingIds.has(claim.unidad_funcional?.edificio_id),
-    ),
-  );
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select(SELECT_FIELDS)
+    .eq("id", claimId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return (await addSignedImageUrls([data]))[0];
 }
 
 export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
@@ -322,20 +313,18 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
     return data ?? [];
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: activeAssignments, error: assignmentsError } = await supabase
+  const { data: assignments, error: assignmentsError } = await supabase
     .from("unidad_usuarios")
     .select(
       "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso )",
     )
     .eq("usuario_id", userId)
-    .lte("fecha_desde", today);
+    .lte("fecha_desde", hoy());
   if (assignmentsError) throw assignmentsError;
-  const assignedUnits = (activeAssignments ?? [])
-    .filter((row) => !row.fecha_hasta || row.fecha_hasta >= today)
+  return (assignments ?? [])
+    .filter((row) => asignacionVigente(row))
     .map((row) => row.unidad_funcional)
     .filter(Boolean);
-  return assignedUnits;
 }
 
 export async function createClaim(claimData) {
@@ -395,14 +384,25 @@ export async function createClaim(claimData) {
   return (await addSignedImageUrls([data]))[0];
 }
 
-export async function updateClaimStatus(claimId, status, adminId) {
-  const update = {
-    estado: status,
-    fecha_actualizacion: new Date().toISOString(),
-    ...(status === "cerrado"
-      ? { fecha_cierre: new Date().toISOString(), cerrado_por_id: adminId }
-      : { fecha_cierre: null, cerrado_por_id: null }),
-  };
+// Guarda estado y prioridad en una sola operación. Solo cambia fecha_cierre
+// y cerrado_por_id si el estado cambia de verdad.
+export async function updateClaim(
+  claimId,
+  { status, priority, previousStatus },
+  adminId,
+) {
+  const now = new Date().toISOString();
+  const update = { fecha_actualizacion: now };
+  if (priority) update.prioridad = priority;
+  if (status && status !== previousStatus) {
+    update.estado = status;
+    Object.assign(
+      update,
+      status === "cerrado"
+        ? { fecha_cierre: now, cerrado_por_id: adminId }
+        : { fecha_cierre: null, cerrado_por_id: null },
+    );
+  }
 
   if (isDemoMode()) {
     const nextClaims = getStoredClaims().map((claim) =>
@@ -441,7 +441,8 @@ export async function updateClaimPriority(claimId, priority) {
     .select(SELECT_FIELDS)
     .single();
   if (error) throw error;
-  return (await addSignedImageUrls([data]))[0];
+  // Se usa desde la lista, que no muestra fotos.
+  return data;
 }
 
 export async function fetchClaimComments(claimId) {

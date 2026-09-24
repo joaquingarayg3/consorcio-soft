@@ -81,8 +81,9 @@ export function AuthContextProvider({ children }) {
         email: email.trim().toLowerCase(),
         password: password,
       });
+      // Credenciales incorrectas o cuenta dada de baja: el mensaje ya se
+      // muestra en el formulario, no es un error de la aplicación.
       if (error) {
-        console.error("Supabase sing in error: ", error.message);
         return { success: false, error: traducirErrorSingIn(error.message) };
       }
       return { success: true, data };

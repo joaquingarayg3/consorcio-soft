@@ -146,7 +146,8 @@ export default function Home() {
           </div>
         )}
 
-        {perfil?.rol !== "admin" && (
+        {/* undefined = el perfil todavía carga: no mostrar la vista equivocada */}
+        {perfil !== undefined && perfil?.rol !== "admin" && (
           <div className="mt-6 w-full max-w-md sm:max-w-2xl">
             <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
               Accesos

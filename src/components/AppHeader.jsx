@@ -12,6 +12,7 @@ import {
   markUserNotificationsAsRead,
   markClaimsAsViewed,
 } from "../services/claims";
+import { asignacionVigente, hoy } from "../utils/fechas";
 
 export default function AppHeader({ backTo }) {
   const { session, perfil, singOutUser } = useAuth();
@@ -33,7 +34,7 @@ export default function AppHeader({ backTo }) {
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10);
+      const today = hoy();
       const { data, error } = await supabase
         .from("unidad_usuarios")
         .select(
@@ -49,8 +50,8 @@ export default function AppHeader({ backTo }) {
         return;
       }
 
-      const activeAssignment = (data ?? []).find(
-        (row) => !row.fecha_hasta || row.fecha_hasta >= today,
+      const activeAssignment = (data ?? []).find((row) =>
+        asignacionVigente(row, today),
       );
       setUserAssignment(activeAssignment ?? null);
     }
@@ -87,11 +88,8 @@ export default function AppHeader({ backTo }) {
           }
           return;
         }
-        const claims = await fetchClaimsForUser({
-          userId: session.user.id,
-          userEmail: email || "",
-          isAdmin: perfil?.rol === "admin",
-        });
+        // Solo en modo demo (sin Supabase): notificaciones desde localStorage.
+        const claims = await fetchClaimsForUser();
         if (active) {
           setAllClaims(claims);
           setNotifications(getUnreadClaims(claims, session.user.id));
@@ -118,7 +116,7 @@ export default function AppHeader({ backTo }) {
       window.removeEventListener("claims-viewed", refreshNotifications);
       window.removeEventListener("notifications-cleared", refreshNotifications);
     };
-  }, [email, perfil?.rol, session?.user?.id]);
+  }, [session?.user?.id]);
 
   function notificationTitle(claim) {
     return claim.titulo || claim.title || "Nuevo reclamo";
@@ -135,10 +133,18 @@ export default function AppHeader({ backTo }) {
     }
   }
 
-  function handleClearHistory() {
-    clearUserNotifications(session?.user?.id).catch(() => null);
-    clearNotificationHistory(session?.user?.id, allClaims);
+  async function handleClearHistory() {
+    const previous = notificationHistory;
     setNotificationHistory([]);
+    try {
+      await clearUserNotifications(session?.user?.id);
+      clearNotificationHistory(session?.user?.id, allClaims);
+    } catch (clearError) {
+      // Si la base no las ocultó, volverían a aparecer al cambiar de página:
+      // mejor mostrarlas de nuevo ahora.
+      console.error("No se pudo limpiar el historial", clearError);
+      setNotificationHistory(previous);
+    }
   }
 
   return (

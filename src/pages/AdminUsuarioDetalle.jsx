@@ -4,6 +4,7 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { getAdminFunctionErrorMessage } from "../utils/supabase-errors";
+import { asignacionVigente, hoy } from "../utils/fechas";
 
 function obtenerPerfil(id) {
   return supabase.from("perfiles").select("*").eq("id", id).single();
@@ -19,14 +20,8 @@ function obtenerUnidadesAsignadas(id) {
     .order("fecha_desde", { ascending: false });
 }
 
-function hoy() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function findActiveAssignment(asignaciones) {
-  return (asignaciones || []).find(
-    (u) => !u.fecha_hasta || new Date(u.fecha_hasta) >= new Date(),
-  );
+  return (asignaciones || []).find((u) => asignacionVigente(u));
 }
 
 const inputClass =
@@ -156,11 +151,31 @@ export default function AdminUsuarioDetalle() {
       return;
     }
 
+    const activeAssignment = findActiveAssignment(unidadesAsignadas);
+    const vinculo = vinculoSeleccionado || "propietario";
+    if (
+      activeAssignment?.unidad_funcional?.id === unidadSeleccionada &&
+      activeAssignment?.vinculo === vinculo
+    ) {
+      setErrorAsignacion("El usuario ya tiene asignada esa unidad.");
+      return;
+    }
+
     setAsignandoUnidad(true);
     setErrorAsignacion(null);
 
     try {
-      const activeAssignment = findActiveAssignment(unidadesAsignadas);
+      // Primero la nueva: si falla, el usuario conserva la que tenía.
+      const { error: insertError } = await supabase
+        .from("unidad_usuarios")
+        .insert({
+          usuario_id: id,
+          unidad_id: unidadSeleccionada,
+          vinculo,
+          fecha_desde: hoy(),
+        });
+
+      if (insertError) throw insertError;
 
       if (activeAssignment) {
         const { error: cerrarError } = await supabase
@@ -170,17 +185,6 @@ export default function AdminUsuarioDetalle() {
 
         if (cerrarError) throw cerrarError;
       }
-
-      const { error: insertError } = await supabase
-        .from("unidad_usuarios")
-        .insert({
-          usuario_id: id,
-          unidad_id: unidadSeleccionada,
-          vinculo: vinculoSeleccionado || "propietario",
-          fecha_desde: hoy(),
-        });
-
-      if (insertError) throw insertError;
 
       const { data: unidadesData } = await obtenerUnidadesAsignadas(id);
       setUnidadesAsignadas(unidadesData || []);
