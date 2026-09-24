@@ -373,6 +373,7 @@ export default function ReclamoDetalle() {
                   id="claim-comment"
                   required
                   rows="3"
+                  maxLength={2000}
                   value={comment}
                   onChange={(event) => setComment(event.target.value)}
                   disabled={saving}

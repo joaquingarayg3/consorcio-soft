@@ -4,6 +4,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const allowedOrigins = new Set(
   ["http://localhost:5173", Deno.env.get("APP_ORIGIN")].filter(Boolean),
 );
@@ -65,11 +68,12 @@ Deno.serve(async (req) => {
 
     const { data: perfil, error: perfilError } = await callerClient
       .from("perfiles")
-      .select("rol")
+      .select("rol, activo")
       .eq("id", user.id)
       .single();
 
-    if (perfilError || perfil?.rol !== "admin") {
+    // activo: un admin dado de baja puede tener todavía un JWT vigente.
+    if (perfilError || perfil?.rol !== "admin" || perfil?.activo === false) {
       return json({ error: "No tenés permisos de administrador" }, 403, req);
     }
 
@@ -77,7 +81,10 @@ Deno.serve(async (req) => {
     // vive solo acá, en el entorno de la función.
     const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return json({ error: "Solicitud inválida" }, 400, req);
+    }
     const { action } = body;
 
     if (action === "create") {
@@ -88,11 +95,13 @@ Deno.serve(async (req) => {
       const nombre = String(body.nombre || "").trim();
       const apellido = String(body.apellido || "").trim();
       const rol = body.rol || "user";
-      const unidadId = typeof body.unidad_id === "string" ? body.unidad_id : null;
+      const unidadId =
+        typeof body.unidad_id === "string" && body.unidad_id ? body.unidad_id : null;
       const vinculo = String(body.vinculo || "propietario").trim();
       if (
         !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
         password.length < 8 ||
+        password.length > 72 ||
         nombre.length < 1 ||
         nombre.length > 80 ||
         apellido.length < 1 ||
@@ -144,13 +153,11 @@ Deno.serve(async (req) => {
 
     if (action === "deactivate" || action === "reactivate") {
       const { userId } = body;
-      if (
-        typeof userId !== "string" ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-          userId,
-        )
-      ) {
+      if (typeof userId !== "string" || !UUID_RE.test(userId)) {
         return json({ error: "Falta el id del usuario" }, 400, req);
+      }
+      if (action === "deactivate" && userId === user.id) {
+        return json({ error: "No podés dar de baja tu propia cuenta" }, 400, req);
       }
 
       const banDuration = action === "deactivate" ? "876000h" : "none";
@@ -176,7 +183,8 @@ Deno.serve(async (req) => {
 
     return json({ error: "Acción desconocida" }, 400, req);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error inesperado";
-    return json({ error: message }, 500, req);
+    // El detalle queda en los logs de la función, no en la respuesta.
+    console.error("admin-users:", err);
+    return json({ error: "Error inesperado" }, 500, req);
   }
 });

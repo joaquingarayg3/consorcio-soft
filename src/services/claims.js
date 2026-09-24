@@ -17,19 +17,7 @@ const SELECT_FIELDS = `
   cerrado_por:cerrado_por_id ( nombre, apellido )
 `;
 
-function isMissingCommentsTable(error) {
-  return (
-    error?.code === "PGRST205" ||
-    error?.message?.includes("reclamo_comentarios")
-  );
-}
-
-function isMissingClaimsBucket(error) {
-  return (
-    error?.message?.toLowerCase().includes("bucket not found") ||
-    error?.statusCode === "404"
-  );
-}
+const SAFE_DATA_IMAGE = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=]+$/i;
 
 function readLocalComments(claimId) {
   try {
@@ -86,7 +74,7 @@ async function uploadClaimImages(files, userId) {
 
   const uploadedPaths = [];
   for (const file of files) {
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const extension = file.type.split("/")[1] === "jpeg" ? "jpg" : file.type.split("/")[1];
     const path = `${userId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await supabase.storage
       .from(CLAIMS_BUCKET)
@@ -99,13 +87,7 @@ async function uploadClaimImages(files, userId) {
       if (uploadedPaths.length) {
         await supabase.storage.from(CLAIMS_BUCKET).remove(uploadedPaths);
       }
-      if (isMissingClaimsBucket(error)) {
-        console.warn(
-          "El bucket reclamos no existe; se guardarán las imágenes en el reclamo.",
-        );
-        return Promise.all(files.map(readFileAsDataUrl));
-      }
-      throw error;
+      throw new Error("No se pudieron subir las imágenes. Intentá de nuevo.");
     }
     uploadedPaths.push(path);
   }
@@ -129,7 +111,14 @@ async function addSignedImageUrls(claims) {
       .map(storagePathFromImage)
       .filter(Boolean),
   );
-  if (!paths.length) return normalizedClaims;
+  if (!paths.length) {
+    return normalizedClaims.map((claim) => ({
+      ...claim,
+      imagen_urls: (claim.imagen_urls || claim.image_urls || []).filter(
+        isSafeImageUrl,
+      ),
+    }));
+  }
 
   const { data, error } = await supabase.storage
     .from(CLAIMS_BUCKET)
@@ -141,10 +130,27 @@ async function addSignedImageUrls(claims) {
   );
   return normalizedClaims.map((claim) => ({
     ...claim,
-    imagen_urls: (claim.imagen_urls || claim.image_urls || []).map(
-      (image) => signedUrls.get(storagePathFromImage(image)) || image,
-    ),
+    imagen_urls: (claim.imagen_urls || claim.image_urls || [])
+      .map((image) => signedUrls.get(storagePathFromImage(image)) || image)
+      .filter(isSafeImageUrl),
   }));
+}
+
+// imagen_urls lo escribe quien crea el reclamo: solo dejamos pasar URLs
+// firmadas por nuestro propio Storage o imágenes base64, nunca enlaces
+// externos (rastreo) ni esquemas como javascript:.
+function isSafeImageUrl(url) {
+  if (typeof url !== "string") return false;
+  if (SAFE_DATA_IMAGE.test(url)) return true;
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.origin === new URL(import.meta.env.VITE_SUPABASE_URL).origin &&
+      parsed.pathname.startsWith(`/storage/v1/object/sign/${CLAIMS_BUCKET}/`)
+    );
+  } catch {
+    return false;
+  }
 }
 
 function demoClaimsForUser() {
@@ -450,10 +456,7 @@ export async function fetchClaimComments(claimId) {
     .select("*, autor:usuario_id ( nombre, apellido, email )")
     .eq("reclamo_id", claimId)
     .order("created_at", { ascending: true });
-  if (error) {
-    if (isMissingCommentsTable(error)) return readLocalComments(claimId);
-    throw error;
-  }
+  if (error) throw error;
   return data ?? [];
 }
 
@@ -476,20 +479,6 @@ export async function addClaimComment({ claimId, userId, comment, author }) {
     .insert({ reclamo_id: claimId, usuario_id: userId, comentario: comment })
     .select("*, autor:usuario_id ( nombre, apellido, email )")
     .single();
-  if (error) {
-    if (isMissingCommentsTable(error)) {
-      const newComment = {
-        id: `local-comment-${Date.now()}`,
-        reclamo_id: claimId,
-        usuario_id: userId,
-        comentario: comment,
-        created_at: new Date().toISOString(),
-        autor: author,
-      };
-      saveLocalComment(claimId, newComment);
-      return newComment;
-    }
-    throw error;
-  }
+  if (error) throw error;
   return data;
 }
