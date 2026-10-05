@@ -4,6 +4,10 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
+import {
+  getAdminFunctionErrorMessage,
+  mensajeDeError,
+} from "../utils/supabase-errors";
 
 function obtenerUsuarios() {
   return supabase
@@ -13,8 +17,7 @@ function obtenerUsuarios() {
 }
 
 function generarContrasena() {
-  const alfabeto =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   const valores = new Uint32Array(12);
   crypto.getRandomValues(valores);
   return Array.from(valores, (v) => alfabeto[v % alfabeto.length]).join("");
@@ -34,6 +37,12 @@ export default function AdminUsuarios() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(generarContrasena());
   const [rol, setRol] = useState("user");
+  const [vinculo, setVinculo] = useState("propietario");
+  const [edificioId, setEdificioId] = useState("");
+  const [unidadId, setUnidadId] = useState("");
+  const [edificios, setEdificios] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [cargandoEdificios, setCargandoEdificios] = useState(false);
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState(null);
   const [credencialesCreadas, setCredencialesCreadas] = useState(null);
@@ -41,10 +50,54 @@ export default function AdminUsuarios() {
   const [accionPendiente, setAccionPendiente] = useState(null);
   const [confirmandoBaja, setConfirmandoBaja] = useState(null);
 
+  useEffect(() => {
+    async function cargarEdificios() {
+      setCargandoEdificios(true);
+      const { data, error } = await supabase
+        .from("edificio")
+        .select("id, nombre")
+        .order("nombre");
+      setCargandoEdificios(false);
+      if (error) {
+        setEdificios([]);
+        return;
+      }
+      setEdificios(data ?? []);
+    }
+    cargarEdificios();
+  }, []);
+
+  useEffect(() => {
+    async function cargarUnidades() {
+      if (!edificioId) {
+        setUnidades([]);
+        setUnidadId("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("unidad_funcional")
+        .select("id, identificador, piso, tipo")
+        .eq("edificio_id", edificioId)
+        .order("identificador");
+
+      if (error) {
+        setUnidades([]);
+        setUnidadId("");
+        return;
+      }
+
+      setUnidades(data ?? []);
+      setUnidadId("");
+    }
+
+    cargarUnidades();
+  }, [edificioId]);
+
   async function refrescarUsuarios() {
     const { data, error } = await obtenerUsuarios();
     if (error) {
-      setListError(error.message);
+      setListError(mensajeDeError(error));
       return;
     }
     setListError(null);
@@ -55,7 +108,7 @@ export default function AdminUsuarios() {
     async function cargarInicial() {
       const { data, error } = await obtenerUsuarios();
       if (error) {
-        setListError(error.message);
+        setListError(mensajeDeError(error));
         return;
       }
       setListError(null);
@@ -70,13 +123,28 @@ export default function AdminUsuarios() {
     setFormError(null);
 
     const { data, error } = await supabase.functions.invoke("admin-users", {
-      body: { action: "create", email, password, nombre, apellido, rol },
+      body: {
+        action: "create",
+        email,
+        password,
+        nombre,
+        apellido,
+        rol,
+        unidad_id: unidadId || undefined,
+        vinculo: vinculo || "propietario",
+      },
     });
 
     setCreando(false);
 
     if (error || data?.error) {
-      setFormError(data?.error || error.message);
+      setFormError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo crear el usuario. Revisá los datos e intentá nuevamente.",
+        ),
+      );
       return;
     }
 
@@ -86,6 +154,10 @@ export default function AdminUsuarios() {
     setEmail("");
     setPassword(generarContrasena());
     setRol("user");
+    setVinculo("propietario");
+    setEdificioId("");
+    setUnidadId("");
+    setUnidades([]);
     setFormAbierto(false);
     refrescarUsuarios();
   }
@@ -101,7 +173,13 @@ export default function AdminUsuarios() {
     setAccionPendiente(null);
 
     if (error || data?.error) {
-      setListError(data?.error || error.message);
+      setListError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo actualizar el estado del usuario.",
+        ),
+      );
       return;
     }
     refrescarUsuarios();
@@ -145,11 +223,12 @@ export default function AdminUsuarios() {
         {credencialesCreadas && (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <p className="font-medium">
-              Usuario creado. Copiá estos datos y compartíselos por afuera de
-              la app (no se van a volver a mostrar):
+              Usuario creado. Copiá estos datos y compartíselos por afuera de la
+              app (no se van a volver a mostrar):
             </p>
             <p className="mt-1">
-              Email: <span className="font-mono">{credencialesCreadas.email}</span>
+              Email:{" "}
+              <span className="font-mono">{credencialesCreadas.email}</span>
             </p>
             <p>
               Contraseña temporal:{" "}
@@ -233,6 +312,70 @@ export default function AdminUsuarios() {
             </div>
 
             <div>
+              <label htmlFor="edificio" className={labelClass}>
+                Edificio
+              </label>
+              <select
+                id="edificio"
+                value={edificioId}
+                onChange={(e) => setEdificioId(e.target.value)}
+                disabled={creando || cargandoEdificios}
+                className={inputClass}
+              >
+                <option value="">Sin edificio asignado</option>
+                {edificios.map((edificio) => (
+                  <option key={edificio.id} value={edificio.id}>
+                    {edificio.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="unidad" className={labelClass}>
+                Unidad
+              </label>
+              <select
+                id="unidad"
+                value={unidadId}
+                onChange={(e) => setUnidadId(e.target.value)}
+                disabled={creando || !edificioId || unidades.length === 0}
+                className={inputClass}
+              >
+                <option value="">
+                  {edificioId
+                    ? "Seleccionar unidad"
+                    : "Elegí un edificio primero"}
+                </option>
+                {unidades.map((unidad) => (
+                  <option key={unidad.id} value={unidad.id}>
+                    {unidad.identificador}
+                    {unidad.piso ? ` · Piso ${unidad.piso}` : ""}{" "}
+                    {unidad.tipo ? `(${unidad.tipo})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="vinculo" className={labelClass}>
+                Vínculo con la unidad
+              </label>
+              <select
+                id="vinculo"
+                value={vinculo}
+                onChange={(e) => setVinculo(e.target.value)}
+                disabled={creando}
+                className={inputClass}
+              >
+                <option value="propietario">Propietario</option>
+                <option value="inquilino">Inquilino</option>
+                <option value="ocupante">Ocupante</option>
+                <option value="otros">Otros</option>
+              </select>
+            </div>
+
+            <div>
               <label htmlFor="rol" className={labelClass}>
                 Rol
               </label>
@@ -280,9 +423,7 @@ export default function AdminUsuarios() {
                   <p className="truncate font-semibold text-stone-900">
                     {u.nombre} {u.apellido}
                   </p>
-                  <p className="truncate text-sm text-stone-500">
-                    {u.email}
-                  </p>
+                  <p className="truncate text-sm text-stone-500">{u.email}</p>
                 </Link>
                 <span
                   className={
@@ -330,7 +471,10 @@ export default function AdminUsuarios() {
             </thead>
             <tbody>
               {usuarios?.map((u) => (
-                <tr key={u.id} className="border-b border-stone-100 last:border-0">
+                <tr
+                  key={u.id}
+                  className="border-b border-stone-100 last:border-0"
+                >
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/usuarios/${u.id}`}
@@ -368,7 +512,10 @@ export default function AdminUsuarios() {
               ))}
               {usuarios?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-stone-500">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-stone-500"
+                  >
                     Todavía no hay usuarios cargados.
                   </td>
                 </tr>

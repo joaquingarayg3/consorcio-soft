@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
+import { mensajeDeError } from "../utils/supabase-errors";
 
 function obtenerEdificios() {
   return supabase.from("edificio").select("*").order("nombre");
@@ -29,7 +30,7 @@ export default function AdminEdificios() {
   async function refrescarEdificios() {
     const { data, error } = await obtenerEdificios();
     if (error) {
-      setListError(error.message);
+      setListError(mensajeDeError(error));
       return;
     }
     setListError(null);
@@ -40,7 +41,7 @@ export default function AdminEdificios() {
     async function cargarInicial() {
       const { data, error } = await obtenerEdificios();
       if (error) {
-        setListError(error.message);
+        setListError(mensajeDeError(error));
         return;
       }
       setListError(null);
@@ -58,14 +59,14 @@ export default function AdminEdificios() {
       nombre,
       direccion,
       ciudad: ciudad || null,
-      provincia: provincia || null,
+      provincia: provincia.trim(),
       codigo_postal: codigoPostal || null,
     });
 
     setCreando(false);
 
     if (error) {
-      setFormError(error.message);
+      setFormError(mensajeDeError(error));
       return;
     }
 
@@ -157,6 +158,7 @@ export default function AdminEdificios() {
                 <input
                   id="provincia"
                   type="text"
+                  required
                   value={provincia}
                   onChange={(e) => setProvincia(e.target.value)}
                   disabled={creando}

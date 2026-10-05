@@ -106,9 +106,7 @@ export default function PopoverForm({
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
                   </motion.div>
-                  <p className="font-semibold text-stone-900">
-                    {successTitle}
-                  </p>
+                  <p className="font-semibold text-stone-900">{successTitle}</p>
                   <p className="mt-1 text-sm text-stone-500">
                     {successMessage}
                   </p>

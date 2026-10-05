@@ -39,8 +39,8 @@ export default class ErrorBoundary extends Component {
             Ocurrió un error inesperado
           </p>
           <p className="max-w-sm text-sm text-stone-500">
-            Algo falló al mostrar esta pantalla. Probá recargar la página; si
-            el problema persiste, avisale al equipo técnico.
+            Algo falló al mostrar esta pantalla. Probá recargar la página; si el
+            problema persiste, avisale al equipo técnico.
           </p>
           <button
             type="button"

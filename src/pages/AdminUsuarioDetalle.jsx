@@ -3,6 +3,11 @@ import { useParams } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
+import {
+  getAdminFunctionErrorMessage,
+  mensajeDeError,
+} from "../utils/supabase-errors";
+import { asignacionVigente, hoy } from "../utils/fechas";
 
 function obtenerPerfil(id) {
   return supabase.from("perfiles").select("*").eq("id", id).single();
@@ -12,10 +17,14 @@ function obtenerUnidadesAsignadas(id) {
   return supabase
     .from("unidad_usuarios")
     .select(
-      "vinculo, fecha_desde, fecha_hasta, unidad_funcional(identificador, tipo, edificio(nombre))",
+      "id, vinculo, fecha_desde, fecha_hasta, unidad_funcional(id, identificador, tipo, edificio_id, edificio(nombre))",
     )
     .eq("usuario_id", id)
     .order("fecha_desde", { ascending: false });
+}
+
+function findActiveAssignment(asignaciones) {
+  return (asignaciones || []).find((u) => asignacionVigente(u));
 }
 
 const inputClass =
@@ -26,13 +35,20 @@ export default function AdminUsuarioDetalle() {
   const { id } = useParams();
 
   const [perfil, setPerfil] = useState(undefined);
-  const [unidades, setUnidades] = useState(null);
+  const [unidadesAsignadas, setUnidadesAsignadas] = useState(null);
   const [cargaError, setCargaError] = useState(null);
 
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
   const [telefono, setTelefono] = useState("");
   const [rol, setRol] = useState("user");
+  const [edificios, setEdificios] = useState([]);
+  const [unidadesDisponibles, setUnidadesDisponibles] = useState([]);
+  const [edificioSeleccionado, setEdificioSeleccionado] = useState("");
+  const [unidadSeleccionada, setUnidadSeleccionada] = useState("");
+  const [vinculoSeleccionado, setVinculoSeleccionado] = useState("propietario");
+  const [asignandoUnidad, setAsignandoUnidad] = useState(false);
+  const [errorAsignacion, setErrorAsignacion] = useState(null);
 
   const [guardando, setGuardando] = useState(false);
   const [guardadoError, setGuardadoError] = useState(null);
@@ -41,12 +57,23 @@ export default function AdminUsuarioDetalle() {
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
 
   useEffect(() => {
+    async function cargarEdificios() {
+      const { data, error } = await supabase
+        .from("edificio")
+        .select("id, nombre")
+        .order("nombre");
+      if (!error) setEdificios(data ?? []);
+    }
+    cargarEdificios();
+  }, []);
+
+  useEffect(() => {
     async function cargar() {
       const [{ data: perfilData, error: perfilError }, { data: unidadesData }] =
         await Promise.all([obtenerPerfil(id), obtenerUnidadesAsignadas(id)]);
 
       if (perfilError) {
-        setCargaError(perfilError.message);
+        setCargaError(mensajeDeError(perfilError));
         setPerfil(null);
         return;
       }
@@ -55,10 +82,47 @@ export default function AdminUsuarioDetalle() {
       setApellido(perfilData.apellido || "");
       setTelefono(perfilData.telefono || "");
       setRol(perfilData.rol);
-      setUnidades(unidadesData || []);
+      setUnidadesAsignadas(unidadesData || []);
+
+      const activeAssignment = findActiveAssignment(unidadesData);
+      const buildingId = activeAssignment?.unidad_funcional?.edificio_id;
+      const unitId = activeAssignment?.unidad_funcional?.id;
+      if (buildingId) setEdificioSeleccionado(buildingId);
+      if (unitId) setUnidadSeleccionada(unitId);
+      if (activeAssignment?.vinculo)
+        setVinculoSeleccionado(activeAssignment.vinculo);
     }
     cargar();
   }, [id]);
+
+  useEffect(() => {
+    async function cargarUnidades() {
+      if (!edificioSeleccionado) {
+        setUnidadesDisponibles([]);
+        setUnidadSeleccionada("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("unidad_funcional")
+        .select("id, identificador, piso, tipo, edificio_id")
+        .eq("edificio_id", edificioSeleccionado)
+        .order("identificador");
+
+      if (error) {
+        setUnidadSeleccionada("");
+        setUnidadesDisponibles([]);
+        return;
+      }
+
+      setUnidadesDisponibles(data ?? []);
+      setUnidadSeleccionada((current) =>
+        (data ?? []).some((unidad) => unidad.id === current) ? current : "",
+      );
+    }
+
+    cargarUnidades();
+  }, [edificioSeleccionado]);
 
   async function handleGuardar(e) {
     e.preventDefault();
@@ -76,11 +140,64 @@ export default function AdminUsuarioDetalle() {
     setGuardando(false);
 
     if (error) {
-      setGuardadoError(error.message);
+      setGuardadoError(mensajeDeError(error));
       return;
     }
     setPerfil(data);
     setGuardadoOk(true);
+  }
+
+  async function handleAsignarUnidad(e) {
+    e.preventDefault();
+    if (!unidadSeleccionada) {
+      setErrorAsignacion("Elegí una unidad para modificar la asignación.");
+      return;
+    }
+
+    const activeAssignment = findActiveAssignment(unidadesAsignadas);
+    const vinculo = vinculoSeleccionado || "propietario";
+    if (
+      activeAssignment?.unidad_funcional?.id === unidadSeleccionada &&
+      activeAssignment?.vinculo === vinculo
+    ) {
+      setErrorAsignacion("El usuario ya tiene asignada esa unidad.");
+      return;
+    }
+
+    setAsignandoUnidad(true);
+    setErrorAsignacion(null);
+
+    try {
+      // Primero la nueva: si falla, el usuario conserva la que tenía.
+      const { error: insertError } = await supabase
+        .from("unidad_usuarios")
+        .insert({
+          usuario_id: id,
+          unidad_id: unidadSeleccionada,
+          vinculo,
+          fecha_desde: hoy(),
+        });
+
+      if (insertError) throw insertError;
+
+      if (activeAssignment) {
+        const { error: cerrarError } = await supabase
+          .from("unidad_usuarios")
+          .update({ fecha_hasta: hoy() })
+          .eq("id", activeAssignment.id);
+
+        if (cerrarError) throw cerrarError;
+      }
+
+      const { data: unidadesData } = await obtenerUnidadesAsignadas(id);
+      setUnidadesAsignadas(unidadesData || []);
+    } catch (error) {
+      setErrorAsignacion(
+        mensajeDeError(error, "No se pudo modificar la unidad."),
+      );
+    } finally {
+      setAsignandoUnidad(false);
+    }
   }
 
   async function handleCambiarEstado(activar) {
@@ -91,7 +208,13 @@ export default function AdminUsuarioDetalle() {
     setAccionPendiente(false);
 
     if (error || data?.error) {
-      setGuardadoError(data?.error || error.message);
+      setGuardadoError(
+        await getAdminFunctionErrorMessage(
+          error,
+          data,
+          "No se pudo actualizar el estado del usuario.",
+        ),
+      );
       return;
     }
     setPerfil((p) => ({ ...p, activo: activar }));
@@ -160,8 +283,7 @@ export default function AdminUsuarioDetalle() {
                 </div>
               </div>
               <p className="mt-3 text-xs text-stone-400">
-                Alta:{" "}
-                {new Date(perfil.created_at).toLocaleDateString("es-AR")}
+                Alta: {new Date(perfil.created_at).toLocaleDateString("es-AR")}
               </p>
 
               <button
@@ -273,9 +395,98 @@ export default function AdminUsuarioDetalle() {
               <h2 className="text-base font-semibold text-stone-900">
                 Unidades asignadas
               </h2>
-              {unidades?.length ? (
-                <ul className="mt-3 divide-y divide-stone-100">
-                  {unidades.map((u, i) => (
+
+              <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700">
+                Unidad actual:{" "}
+                {findActiveAssignment(unidadesAsignadas)?.unidad_funcional
+                  ?.identificador || "Sin unidad asignada"}
+              </div>
+
+              <form onSubmit={handleAsignarUnidad} className="mt-4 space-y-4">
+                <div>
+                  <label htmlFor="edificio-asignado" className={labelClass}>
+                    Edificio
+                  </label>
+                  <select
+                    id="edificio-asignado"
+                    value={edificioSeleccionado}
+                    onChange={(e) => setEdificioSeleccionado(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Seleccionar edificio</option>
+                    {edificios.map((edificio) => (
+                      <option key={edificio.id} value={edificio.id}>
+                        {edificio.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="unidad-asignada" className={labelClass}>
+                    Unidad
+                  </label>
+                  <select
+                    id="unidad-asignada"
+                    value={unidadSeleccionada}
+                    onChange={(e) => setUnidadSeleccionada(e.target.value)}
+                    disabled={!edificioSeleccionado}
+                    className={inputClass}
+                  >
+                    <option value="">
+                      {edificioSeleccionado
+                        ? "Seleccionar unidad"
+                        : "Elegí un edificio primero"}
+                    </option>
+                    {edificios.length && !edificioSeleccionado ? null : null}
+                    {unidadesDisponibles.map((unidad) => (
+                      <option key={unidad.id} value={unidad.id}>
+                        {unidad.identificador}
+                        {unidad.piso ? ` · Piso ${unidad.piso}` : ""}
+                        {unidad.tipo ? ` (${unidad.tipo})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="vinculo-asignado" className={labelClass}>
+                    Vínculo con la unidad
+                  </label>
+                  <select
+                    id="vinculo-asignado"
+                    value={vinculoSeleccionado}
+                    onChange={(e) => setVinculoSeleccionado(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="propietario">Propietario</option>
+                    <option value="inquilino">Inquilino</option>
+                    <option value="ocupante">Ocupante</option>
+                    <option value="otros">Otros</option>
+                  </select>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={asignandoUnidad || !unidadSeleccionada}
+                  className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
+                >
+                  {asignandoUnidad ? "Guardando..." : "Modificar unidad"}
+                </button>
+
+                {errorAsignacion && (
+                  <div
+                    role="alert"
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    {errorAsignacion}
+                  </div>
+                )}
+              </form>
+
+              {unidadesAsignadas?.length ? (
+                <ul className="mt-5 divide-y divide-stone-100">
+                  {unidadesAsignadas.map((u, i) => (
                     <li key={i} className="py-2 text-sm text-stone-700">
                       <span className="font-medium">
                         {u.unidad_funcional?.edificio?.nombre}

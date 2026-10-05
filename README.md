@@ -1,19 +1,86 @@
-# React + Vite
+# Consorcio Soft
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplicacion para gestionar edificios, unidades, usuarios y reclamos de mantenimiento con React, Vite y Supabase.
 
-Currently, two official plugins are available:
+## Requisitos
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20 o superior
+- pnpm
+- Un proyecto de Supabase
 
-## React Compiler
+## Instalacion
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+```bash
+pnpm install
+Copy-Item .env.example .env
+```
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+Completa `.env` con la URL y la clave publicable de tu proyecto Supabase. Nunca agregues `.env` al repositorio.
 
-## Expanding the ESLint configuration
+## Desarrollo
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+pnpm dev
+```
+
+La aplicacion queda disponible en `http://localhost:5173`.
+
+## Validacion y build
+
+```bash
+pnpm lint
+pnpm build
+pnpm preview
+```
+
+## Supabase
+
+La clave `service_role` se usa unicamente en la Edge Function `admin-users` y nunca debe exponerse en el frontend.
+
+Configura en la Edge Function:
+
+```text
+APP_ORIGIN=http://localhost:5173
+```
+
+En produccion, reemplaza ese valor por el dominio real de la aplicacion.
+
+Las migraciones de `supabase/migrations` se aplican en el orden de su número de versión:
+
+| Migración | Qué hace |
+| --- | --- |
+| `20260924120000_seguridad_rls.sql` | Corrige la escalada a admin en `perfiles` y define las políticas RLS de todas las tablas y del bucket `reclamos`. |
+| `20260924120100_permisos_tablas.sql` | Quita todo acceso sin sesión (`anon`) y `TRUNCATE`; habilita crear reclamos. |
+| `20260924120200_funciones_privadas.sql` | Mueve las funciones auxiliares de RLS al esquema `private`, que la API no expone. |
+| `20260924120300_asignaciones_vigentes.sql` | `fecha_hasta` de una asignación pasa a ser exclusiva (finalizar hoy corta el acceso en el acto) y permite reasignar a alguien a una unidad que ya tuvo. |
+| `20260924120400_rendimiento_rls.sql` | Índices en claves foráneas y `auth.uid()` evaluado una vez por consulta. |
+| `20260924120500_reclamos_select_fila.sql` | La lectura de reclamos se evalúa con la propia fila: permite que un usuario común cree reclamos. |
+
+Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
+
+```bash
+npx supabase link --project-ref <id-del-proyecto>
+npx supabase db push
+```
+
+Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, `reclamos`, `reclamo_comentarios`) se crearon desde el panel y no tienen migración propia.
+
+### Reglas de seguridad
+
+- El registro público está desactivado: los usuarios los crea un admin desde la Edge Function `admin-users`.
+- Un usuario ve los reclamos de los edificios donde tiene una unidad vigente, y solo su propio perfil.
+- Un usuario solo puede crear reclamos a su nombre, en su unidad, abiertos y sin prioridad `Urgente`.
+- Cambiar estado o prioridad, borrar reclamos, y administrar edificios, unidades y usuarios es solo para admins.
+- Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
+
+`supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.
+
+## Publicacion
+
+Antes de publicar:
+
+1. Verifica que `.env` no este incluido en Git.
+2. Ejecuta `pnpm lint` y `pnpm build`.
+3. Despliega la Edge Function `admin-users`.
+4. Ejecuta las migraciones de Supabase.
+5. Proba RLS con usuarios de distintos edificios y un usuario sin unidad.

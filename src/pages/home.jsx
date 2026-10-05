@@ -44,6 +44,25 @@ const accesos = [
       </svg>
     ),
   },
+  {
+    href: "/reclamos",
+    titulo: "Reclamos",
+    descripcion: "Solicitudes y mantenimiento",
+    icono: (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-6 w-6"
+      >
+        <path d="M9 4.5h6M9 3h6a1.5 1.5 0 0 1 1.5 1.5v.5h1A1.5 1.5 0 0 1 19 6.5v14A1.5 1.5 0 0 1 17.5 22h-11A1.5 1.5 0 0 1 5 20.5v-14A1.5 1.5 0 0 1 6.5 5h1v-.5A1.5 1.5 0 0 1 9 3Z" />
+        <path d="m8 13 2 2 5-5" />
+      </svg>
+    ),
+  },
 ];
 
 export default function Home() {
@@ -104,9 +123,7 @@ export default function Home() {
                     {a.icono}
                   </div>
                   <div className="min-w-0 flex-1 text-left">
-                    <p className="font-semibold text-stone-900">
-                      {a.titulo}
-                    </p>
+                    <p className="font-semibold text-stone-900">{a.titulo}</p>
                     <p className="truncate text-sm text-stone-500">
                       {a.descripcion}
                     </p>
@@ -125,6 +142,41 @@ export default function Home() {
                   </svg>
                 </Link>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* undefined = el perfil todavía carga: no mostrar la vista equivocada */}
+        {perfil !== undefined && perfil?.rol !== "admin" && (
+          <div className="mt-6 w-full max-w-md sm:max-w-2xl">
+            <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
+              Accesos
+            </h2>
+            <div className="mt-3">
+              <Link
+                href="/reclamos"
+                className="group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                  {accesos[2].icono}
+                </div>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="font-semibold text-stone-900">Reclamos</p>
+                  <p className="truncate text-sm text-stone-500">
+                    Solicitudes y mantenimiento
+                  </p>
+                </div>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </Link>
             </div>
           </div>
         )}
