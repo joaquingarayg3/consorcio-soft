@@ -12,7 +12,8 @@ import {
   markUserNotificationsAsRead,
   markClaimsAsViewed,
 } from "../services/claims";
-import { asignacionVigente, hoy } from "../utils/fechas";
+import { useAnunciosUsuario } from "../hooks/useAnunciosUsuario";
+import { asignacionVigente, formatearFechaHora, hoy } from "../utils/fechas";
 
 export default function AppHeader({ backTo }) {
   const { session, perfil, singOutUser } = useAuth();
@@ -24,6 +25,15 @@ export default function AppHeader({ backTo }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [allClaims, setAllClaims] = useState([]);
   const [userAssignment, setUserAssignment] = useState(null);
+  const {
+    anuncios: anunciosRecientes,
+    noLeidos: anunciosNoLeidos,
+    marcarLeidos: marcarAnunciosComoLeidos,
+  } = useAnunciosUsuario(session?.user?.id);
+  // Los que eran nuevos al abrir la campanita siguen resaltados mientras
+  // está abierta, aunque ya se hayan marcado como leídos.
+  const [anunciosResaltados, setAnunciosResaltados] = useState(new Set());
+  const totalNuevas = notifications.length + anunciosNoLeidos.size;
 
   useEffect(() => {
     let active = true;
@@ -130,6 +140,8 @@ export default function AppHeader({ backTo }) {
       setNotifications([]);
       markUserNotificationsAsRead(session?.user?.id).catch(() => null);
       markClaimsAsViewed(session?.user?.id);
+      setAnunciosResaltados(new Set(anunciosNoLeidos));
+      marcarAnunciosComoLeidos();
     }
   }
 
@@ -187,7 +199,7 @@ export default function AppHeader({ backTo }) {
         <div className="relative">
           <button
             type="button"
-            aria-label={`Notificaciones${notifications.length ? `: ${notifications.length} nuevas` : ""}`}
+            aria-label={`Notificaciones${totalNuevas ? `: ${totalNuevas} nuevas` : ""}`}
             aria-expanded={notificationsOpen}
             onClick={handleNotificationsOpen}
             className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
@@ -206,9 +218,9 @@ export default function AppHeader({ backTo }) {
                 d="M15 17H9m10-2V11a7 7 0 1 0-14 0v4l-2 2h18l-2-2Zm-5 5h-2"
               />
             </svg>
-            {notifications.length > 0 && (
+            {totalNuevas > 0 && (
               <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                {notifications.length > 9 ? "9+" : notifications.length}
+                {totalNuevas > 9 ? "9+" : totalNuevas}
               </span>
             )}
           </button>
@@ -224,10 +236,55 @@ export default function AppHeader({ backTo }) {
                   Ver reclamos
                 </Link>
               </div>
+              {anunciosRecientes.length > 0 && (
+                <div className="border-b border-stone-100">
+                  <div className="flex items-center justify-between px-4 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+                      Anuncios
+                    </p>
+                    <Link
+                      href="/anuncios"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                    >
+                      Ver todos
+                    </Link>
+                  </div>
+                  {anunciosRecientes.slice(0, 3).map((anuncio) => (
+                    <Link
+                      key={anuncio.id}
+                      href="/anuncios"
+                      onClick={() => setNotificationsOpen(false)}
+                      className="block px-4 py-3 transition-colors hover:bg-stone-50"
+                    >
+                      <p className="flex items-center gap-2 text-sm font-medium text-stone-800">
+                        {anunciosResaltados.has(anuncio.id) && (
+                          <>
+                            <span
+                              aria-hidden="true"
+                              className="h-2 w-2 shrink-0 rounded-full bg-amber-600"
+                            />
+                            <span className="sr-only">Nuevo: </span>
+                          </>
+                        )}
+                        <span className="truncate">{anuncio.titulo}</span>
+                      </p>
+                      <p className="mt-1 truncate text-xs text-stone-400">
+                        {anuncio.edificio?.nombre
+                          ? `${anuncio.edificio.nombre} · `
+                          : ""}
+                        {formatearFechaHora(anuncio.creado_en)}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
               {notificationHistory.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-stone-500">
-                  No hay notificaciones en el historial.
-                </p>
+                anunciosRecientes.length === 0 && (
+                  <p className="px-4 py-6 text-center text-sm text-stone-500">
+                    No hay notificaciones en el historial.
+                  </p>
+                )
               ) : (
                 <>
                   <div className="max-h-80 overflow-y-auto">

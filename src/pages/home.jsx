@@ -65,6 +65,58 @@ const accesos = [
   },
 ];
 
+const accesoAnuncios = {
+  href: "/anuncios",
+  titulo: "Anuncios",
+  descripcion: "Comunicados de la administración",
+  icono: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-6 w-6"
+    >
+      <path d="m3 11 18-5v12L3 14v-3Z" />
+      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+    </svg>
+  ),
+};
+
+function AccesoCard({ acceso }) {
+  return (
+    <Link
+      href={acceso.href}
+      className="group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+    >
+      <div
+        aria-hidden="true"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
+      >
+        {acceso.icono}
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="font-semibold text-stone-900">{acceso.titulo}</p>
+        <p className="truncate text-sm text-stone-500">{acceso.descripcion}</p>
+      </div>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </Link>
+  );
+}
+
 export default function Home() {
   const { session, perfil } = useAuth();
   const email = session?.user?.email;
@@ -111,36 +163,7 @@ export default function Home() {
             </h2>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {accesos.map((a) => (
-                <Link
-                  key={a.href}
-                  href={a.href}
-                  className="group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
-                >
-                  <div
-                    aria-hidden="true"
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
-                  >
-                    {a.icono}
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <p className="font-semibold text-stone-900">{a.titulo}</p>
-                    <p className="truncate text-sm text-stone-500">
-                      {a.descripcion}
-                    </p>
-                  </div>
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
-                  >
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </Link>
+                <AccesoCard key={a.href} acceso={a} />
               ))}
             </div>
           </div>
@@ -152,31 +175,9 @@ export default function Home() {
             <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
               Accesos
             </h2>
-            <div className="mt-3">
-              <Link
-                href="/reclamos"
-                className="group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
-              >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                  {accesos[2].icono}
-                </div>
-                <div className="min-w-0 flex-1 text-left">
-                  <p className="font-semibold text-stone-900">Reclamos</p>
-                  <p className="truncate text-sm text-stone-500">
-                    Solicitudes y mantenimiento
-                  </p>
-                </div>
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
-                >
-                  <path d="m9 18 6-6-6-6" />
-                </svg>
-              </Link>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <AccesoCard acceso={accesos[2]} />
+              <AccesoCard acceso={accesoAnuncios} />
             </div>
           </div>
         )}

@@ -55,6 +55,7 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20260924120300_asignaciones_vigentes.sql` | `fecha_hasta` de una asignación pasa a ser exclusiva (finalizar hoy corta el acceso en el acto) y permite reasignar a alguien a una unidad que ya tuvo. |
 | `20260924120400_rendimiento_rls.sql` | Índices en claves foráneas y `auth.uid()` evaluado una vez por consulta. |
 | `20260924120500_reclamos_select_fila.sql` | La lectura de reclamos se evalúa con la propia fila: permite que un usuario común cree reclamos. |
+| `20261005120000_anuncios.sql` | Crea `anuncios` (por edificio) y `anuncio_lecturas` (qué leyó cada persona), con sus políticas RLS y permisos. |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
 
@@ -71,6 +72,7 @@ Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, 
 - Un usuario ve los reclamos de los edificios donde tiene una unidad vigente, y solo su propio perfil.
 - Un usuario solo puede crear reclamos a su nombre, en su unidad, abiertos y sin prioridad `Urgente`.
 - Cambiar estado o prioridad, borrar reclamos, y administrar edificios, unidades y usuarios es solo para admins.
+- Los anuncios los publica, edita y borra solo un admin, siempre desde la pantalla de un edificio. Los ven los admins y quienes tienen una unidad vigente en ese edificio; cada persona solo registra lecturas propias.
 - Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
 
 `supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.

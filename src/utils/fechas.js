@@ -13,3 +13,12 @@ export function asignacionVigente(asignacion, fecha = hoy()) {
     (!asignacion.fecha_hasta || asignacion.fecha_hasta > fecha)
   );
 }
+
+// "5 oct 2026, 14:30" en hora local, para mostrar cuándo se publicó algo.
+export function formatearFechaHora(valor) {
+  if (!valor) return "";
+  return new Date(valor).toLocaleString("es-AR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}

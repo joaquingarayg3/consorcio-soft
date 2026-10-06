@@ -51,11 +51,25 @@ export async function getAdminFunctionErrorMessage(
   }
 
   const normalized = String(message || error?.message || "").toLowerCase();
-  if (normalized.includes("already registered")) {
+  if (
+    normalized.includes("already registered") ||
+    normalized.includes("already been registered")
+  ) {
     return "Ese correo electrónico ya está registrado.";
   }
   if (normalized.includes("invalid login credentials")) {
     return "El correo electrónico o la contraseña son incorrectos.";
+  }
+  // Va antes que la de largo: el mensaje de Supabase lista "0123456789" y
+  // contiene un 8 aunque el problema no sea la longitud.
+  if (
+    normalized.includes("password") &&
+    (normalized.includes("contain") ||
+      normalized.includes("weak") ||
+      normalized.includes("pwned") ||
+      normalized.includes("easy to guess"))
+  ) {
+    return "La contraseña es muy débil. Usá una más larga que combine mayúsculas, minúsculas y números.";
   }
   if (normalized.includes("password") && normalized.includes("8")) {
     return "La contraseña debe tener al menos 8 caracteres.";

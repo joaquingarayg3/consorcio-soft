@@ -307,7 +307,7 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
   if (isAdmin) {
     const { data, error } = await supabase
       .from("unidad_funcional")
-      .select("id, identificador, piso")
+      .select("id, identificador, piso, edificio_id")
       .order("identificador");
     if (error) throw error;
     return data ?? [];
@@ -316,7 +316,7 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
   const { data: assignments, error: assignmentsError } = await supabase
     .from("unidad_usuarios")
     .select(
-      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso )",
+      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso, edificio_id )",
     )
     .eq("usuario_id", userId)
     .lte("fecha_desde", hoy());

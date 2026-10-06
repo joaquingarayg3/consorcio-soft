@@ -41,6 +41,7 @@ function pantalla(importar) {
 
 const Reclamos = pantalla(() => import("./pages/Reclamos"));
 const ReclamoDetalle = pantalla(() => import("./pages/ReclamoDetalle"));
+const Anuncios = pantalla(() => import("./pages/Anuncios"));
 const AdminUsuarios = pantalla(() => import("./pages/AdminUsuarios"));
 const AdminUsuarioDetalle = pantalla(
   () => import("./pages/AdminUsuarioDetalle"),
@@ -87,6 +88,9 @@ function AppRoutes() {
       <Route path="/reclamos/:id">
         <ProtectedRoute component={ReclamoDetalle} />
       </Route>
+      <Route path="/anuncios">
+        <ProtectedRoute component={Anuncios} />
+      </Route>
       <Route path="/admin/usuarios">
         <AdminRoute component={AdminUsuarios} />
       </Route>
@@ -96,7 +100,7 @@ function AppRoutes() {
       <Route path="/admin/edificios">
         <AdminRoute component={AdminEdificios} />
       </Route>
-      <Route path="/admin/edificios/:id">
+      <Route path="/admin/edificios/:id/:tab?">
         <AdminRoute component={AdminEdificioDetalle} />
       </Route>
     </Switch>

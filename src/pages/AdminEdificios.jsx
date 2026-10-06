@@ -9,12 +9,38 @@ function obtenerEdificios() {
   return supabase.from("edificio").select("*").order("nombre");
 }
 
+function obtenerReclamosAbiertos() {
+  return supabase
+    .from("reclamos")
+    .select("unidad_funcional:unidad_funcional_id ( edificio_id )")
+    .neq("estado", "cerrado");
+}
+
+function contarPorEdificio(filas) {
+  const conteo = {};
+  for (const fila of filas ?? []) {
+    const edificioId = fila.unidad_funcional?.edificio_id;
+    if (edificioId) conteo[edificioId] = (conteo[edificioId] || 0) + 1;
+  }
+  return conteo;
+}
+
+function ReclamosAbiertos({ cantidad }) {
+  if (!cantidad) return null;
+  return (
+    <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+      {cantidad} {cantidad === 1 ? "reclamo abierto" : "reclamos abiertos"}
+    </span>
+  );
+}
+
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 export default function AdminEdificios() {
   const [edificios, setEdificios] = useState(null);
+  const [abiertos, setAbiertos] = useState({});
   const [listError, setListError] = useState(null);
 
   const [formAbierto, setFormAbierto] = useState(false);
@@ -39,13 +65,18 @@ export default function AdminEdificios() {
 
   useEffect(() => {
     async function cargarInicial() {
-      const { data, error } = await obtenerEdificios();
+      const [{ data, error }, { data: reclamos }] = await Promise.all([
+        obtenerEdificios(),
+        obtenerReclamosAbiertos(),
+      ]);
       if (error) {
         setListError(mensajeDeError(error));
         return;
       }
       setListError(null);
       setEdificios(data);
+      // Si los reclamos no cargan, la lista igual se muestra, sin contadores.
+      setAbiertos(contarPorEdificio(reclamos));
     }
     cargarInicial();
   }, []);
@@ -231,6 +262,11 @@ export default function AdminEdificios() {
                   {ed.direccion}
                   {ed.ciudad ? ` · ${ed.ciudad}` : ""}
                 </p>
+                {abiertos[ed.id] > 0 && (
+                  <p className="mt-1">
+                    <ReclamosAbiertos cantidad={abiertos[ed.id]} />
+                  </p>
+                )}
               </div>
             </Link>
           ))}
@@ -249,6 +285,7 @@ export default function AdminEdificios() {
                 <th className="px-4 py-3 font-medium">Nombre</th>
                 <th className="px-4 py-3 font-medium">Dirección</th>
                 <th className="px-4 py-3 font-medium">Ciudad</th>
+                <th className="px-4 py-3 font-medium">Reclamos</th>
               </tr>
             </thead>
             <tbody>
@@ -269,12 +306,19 @@ export default function AdminEdificios() {
                   <td className="px-4 py-3 text-stone-600">
                     {ed.ciudad || "—"}
                   </td>
+                  <td className="px-4 py-3">
+                    {abiertos[ed.id] > 0 ? (
+                      <ReclamosAbiertos cantidad={abiertos[ed.id]} />
+                    ) : (
+                      <span className="text-stone-400">Sin reclamos</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {edificios?.length === 0 && (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={4}
                     className="px-4 py-6 text-center text-stone-500"
                   >
                     Todavía no hay edificios cargados.

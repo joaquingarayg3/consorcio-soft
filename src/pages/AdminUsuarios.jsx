@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
@@ -15,6 +15,10 @@ function obtenerUsuarios() {
     .select("*")
     .order("created_at", { ascending: false });
 }
+
+// Mismos límites que valida la Edge Function admin-users.
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 72;
 
 function generarContrasena() {
   const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
@@ -36,6 +40,7 @@ export default function AdminUsuarios() {
   const [apellido, setApellido] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState(generarContrasena());
+  const passwordRef = useRef(null);
   const [rol, setRol] = useState("user");
   const [vinculo, setVinculo] = useState("propietario");
   const [edificioId, setEdificioId] = useState("");
@@ -117,6 +122,13 @@ export default function AdminUsuarios() {
     cargarInicial();
   }, []);
 
+  const passwordCorta = password.length > 0 && password.length < PASSWORD_MIN;
+
+  function escribirPropiaContrasena() {
+    setPassword("");
+    passwordRef.current?.focus();
+  }
+
   async function handleCrearUsuario(e) {
     e.preventDefault();
     setCreando(true);
@@ -130,8 +142,8 @@ export default function AdminUsuarios() {
         nombre,
         apellido,
         rol,
-        unidad_id: unidadId || undefined,
-        vinculo: vinculo || "propietario",
+        // La asignación a una unidad es opcional; sin unidad no hay vínculo.
+        ...(unidadId ? { unidad_id: unidadId, vinculo } : {}),
       },
     });
 
@@ -286,94 +298,131 @@ export default function AdminUsuarios() {
             </div>
 
             <div>
-              <label htmlFor="password" className={labelClass}>
-                Contraseña temporal
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="password"
-                  type="text"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={creando}
-                  className={`${inputClass} font-mono`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setPassword(generarContrasena())}
-                  disabled={creando}
-                  className="shrink-0 rounded-lg border border-stone-300 px-3 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100"
+              <div className="mb-1 flex items-baseline justify-between gap-3">
+                <label
+                  htmlFor="password"
+                  className="text-sm font-medium text-stone-700"
                 >
-                  Generar
-                </button>
+                  Contraseña temporal
+                </label>
+                <div className="flex gap-3 text-xs font-medium">
+                  <button
+                    type="button"
+                    onClick={() => setPassword(generarContrasena())}
+                    disabled={creando}
+                    className="text-amber-700 hover:text-amber-800 hover:underline disabled:opacity-50"
+                  >
+                    Generar otra
+                  </button>
+                  <button
+                    type="button"
+                    onClick={escribirPropiaContrasena}
+                    disabled={creando}
+                    className="text-amber-700 hover:text-amber-800 hover:underline disabled:opacity-50"
+                  >
+                    Escribir la mía
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="edificio" className={labelClass}>
-                Edificio
-              </label>
-              <select
-                id="edificio"
-                value={edificioId}
-                onChange={(e) => setEdificioId(e.target.value)}
-                disabled={creando || cargandoEdificios}
-                className={inputClass}
-              >
-                <option value="">Sin edificio asignado</option>
-                {edificios.map((edificio) => (
-                  <option key={edificio.id} value={edificio.id}>
-                    {edificio.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="unidad" className={labelClass}>
-                Unidad
-              </label>
-              <select
-                id="unidad"
-                value={unidadId}
-                onChange={(e) => setUnidadId(e.target.value)}
-                disabled={creando || !edificioId || unidades.length === 0}
-                className={inputClass}
-              >
-                <option value="">
-                  {edificioId
-                    ? "Seleccionar unidad"
-                    : "Elegí un edificio primero"}
-                </option>
-                {unidades.map((unidad) => (
-                  <option key={unidad.id} value={unidad.id}>
-                    {unidad.identificador}
-                    {unidad.piso ? ` · Piso ${unidad.piso}` : ""}{" "}
-                    {unidad.tipo ? `(${unidad.tipo})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="vinculo" className={labelClass}>
-                Vínculo con la unidad
-              </label>
-              <select
-                id="vinculo"
-                value={vinculo}
-                onChange={(e) => setVinculo(e.target.value)}
+              <input
+                ref={passwordRef}
+                id="password"
+                type="text"
+                required
+                minLength={PASSWORD_MIN}
+                maxLength={PASSWORD_MAX}
+                autoComplete="new-password"
+                spellCheck={false}
+                aria-describedby="password-ayuda"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 disabled={creando}
-                className={inputClass}
+                className={`${inputClass} font-mono`}
+              />
+              <p
+                id="password-ayuda"
+                className={`mt-1 text-xs ${passwordCorta ? "text-red-600" : "text-stone-500"}`}
               >
-                <option value="propietario">Propietario</option>
-                <option value="inquilino">Inquilino</option>
-                <option value="ocupante">Ocupante</option>
-                <option value="otros">Otros</option>
-              </select>
+                {passwordCorta
+                  ? `Mínimo ${PASSWORD_MIN} caracteres (faltan ${PASSWORD_MIN - password.length}).`
+                  : `Podés usar la sugerida o escribir la tuya (${PASSWORD_MIN} a ${PASSWORD_MAX} caracteres).`}
+              </p>
             </div>
+
+            <fieldset className="space-y-4 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+              <legend className="px-1 text-sm font-semibold text-stone-700">
+                Asignación de unidad{" "}
+                <span className="font-normal text-stone-400">(opcional)</span>
+              </legend>
+              <p className="text-xs text-stone-500">
+                Podés dejarla vacía y asignar la unidad más tarde, desde la
+                pestaña Unidades del edificio. El vínculo se habilita al elegir
+                una unidad.
+              </p>
+              <div>
+                <label htmlFor="edificio" className={labelClass}>
+                  Edificio
+                </label>
+                <select
+                  id="edificio"
+                  value={edificioId}
+                  onChange={(e) => setEdificioId(e.target.value)}
+                  disabled={creando || cargandoEdificios}
+                  className={inputClass}
+                >
+                  <option value="">Sin edificio asignado</option>
+                  {edificios.map((edificio) => (
+                    <option key={edificio.id} value={edificio.id}>
+                      {edificio.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="unidad" className={labelClass}>
+                  Unidad
+                </label>
+                <select
+                  id="unidad"
+                  value={unidadId}
+                  onChange={(e) => setUnidadId(e.target.value)}
+                  disabled={creando || !edificioId || unidades.length === 0}
+                  className={inputClass}
+                >
+                  <option value="">
+                    {edificioId
+                      ? "Seleccionar unidad"
+                      : "Elegí un edificio primero"}
+                  </option>
+                  {unidades.map((unidad) => (
+                    <option key={unidad.id} value={unidad.id}>
+                      {unidad.identificador}
+                      {unidad.piso ? ` · Piso ${unidad.piso}` : ""}{" "}
+                      {unidad.tipo ? `(${unidad.tipo})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="vinculo" className={labelClass}>
+                  Vínculo con la unidad
+                </label>
+                <select
+                  id="vinculo"
+                  value={vinculo}
+                  onChange={(e) => setVinculo(e.target.value)}
+                  disabled={creando || !unidadId}
+                  className={inputClass}
+                >
+                  <option value="propietario">Propietario</option>
+                  <option value="inquilino">Inquilino</option>
+                  <option value="ocupante">Ocupante</option>
+                  <option value="otros">Otros</option>
+                </select>
+              </div>
+            </fieldset>
 
             <div>
               <label htmlFor="rol" className={labelClass}>

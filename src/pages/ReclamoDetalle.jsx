@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, useSearch } from "wouter";
 import AppHeader from "../components/AppHeader";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
@@ -27,9 +27,17 @@ function claimTitle(claim) {
   return claim?.titulo || claim?.title || "Reclamo";
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function ReclamoDetalle() {
   const { id } = useParams();
   const [, navigate] = useLocation();
+  // Si se llegó desde la pantalla de un edificio, "Volver" regresa ahí. Solo
+  // se acepta un UUID: nada que venga de la URL se usa como ruta tal cual.
+  const edificioOrigen = new URLSearchParams(useSearch()).get("edificio");
+  const volverA = UUID.test(edificioOrigen ?? "")
+    ? `/admin/edificios/${edificioOrigen}/reclamos`
+    : "/reclamos";
   const { session, perfil } = useAuth();
   const isAdmin = perfil?.rol === "admin";
   const userId = session?.user?.id;
@@ -141,11 +149,11 @@ export default function ReclamoDetalle() {
 
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader backTo="/reclamos" />
+      <AppHeader backTo={volverA} />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <button
           type="button"
-          onClick={() => navigate("/reclamos")}
+          onClick={() => navigate(volverA)}
           className="mb-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
         >
           <svg
@@ -162,7 +170,7 @@ export default function ReclamoDetalle() {
               d="m15 18-6-6 6-6"
             />
           </svg>
-          Volver a reclamos
+          {volverA === "/reclamos" ? "Volver a reclamos" : "Volver al edificio"}
         </button>
         {loading && (
           <p className="text-sm text-stone-500">Cargando reclamo...</p>

@@ -48,20 +48,21 @@ function priorityFilterClass(value, selected) {
   return selected ? colors[value] : "text-stone-600 hover:bg-stone-100";
 }
 
-function ClaimRow({ claim, isAdmin, pending, onPriorityChange }) {
+function ClaimRow({ claim, isAdmin, pending, onPriorityChange, edificioId }) {
   const [, navigate] = useLocation();
   const priority = claim.prioridad || claim.priority || "Media";
   const status = claim.estado || claim.status || "abierto";
   const reporter = claim.reportante
     ? `${claim.reportante.nombre || ""} ${claim.reportante.apellido || ""}`.trim()
     : "Residente";
+  // Dentro de un edificio, el detalle recuerda de dónde venís para volver ahí.
+  const detailPath = `/reclamos/${claim.id}${edificioId ? `?edificio=${edificioId}` : ""}`;
   return (
     <tr
       tabIndex="0"
-      onClick={() => navigate(`/reclamos/${claim.id}`)}
+      onClick={() => navigate(detailPath)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ")
-          navigate(`/reclamos/${claim.id}`);
+        if (event.key === "Enter" || event.key === " ") navigate(detailPath);
       }}
       className="cursor-pointer border-t border-stone-100 transition-colors hover:bg-amber-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-600/50"
     >
@@ -143,7 +144,13 @@ function SummaryCard({ label, value, detail, alert = false }) {
   );
 }
 
-function ClaimsTable({ claims, isAdmin, pending, onPriorityChange }) {
+function ClaimsTable({
+  claims,
+  isAdmin,
+  pending,
+  onPriorityChange,
+  edificioId,
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left">
@@ -169,6 +176,7 @@ function ClaimsTable({ claims, isAdmin, pending, onPriorityChange }) {
               isAdmin={isAdmin}
               onPriorityChange={onPriorityChange}
               pending={pending}
+              edificioId={edificioId}
             />
           ))}
         </tbody>
@@ -177,7 +185,10 @@ function ClaimsTable({ claims, isAdmin, pending, onPriorityChange }) {
   );
 }
 
-export default function ClaimsPanel() {
+// Sin `edificio`: todos los reclamos que el usuario puede ver. Con `edificio`:
+// solo los de ese edificio (así se usa dentro de la pantalla del edificio).
+export default function ClaimsPanel({ edificio = null }) {
+  const edificioId = edificio?.id ?? null;
   const { session, perfil } = useAuth();
   const isAdmin = perfil?.rol === "admin";
   const userId = session?.user?.id;
@@ -284,18 +295,34 @@ export default function ClaimsPanel() {
     }
   }
 
+  const scopedClaims = useMemo(
+    () =>
+      edificioId
+        ? (claims || []).filter(
+            (claim) => claim.unidad_funcional?.edificio_id === edificioId,
+          )
+        : claims || [],
+    [claims, edificioId],
+  );
+  const scopedUnits = useMemo(
+    () =>
+      edificioId
+        ? units.filter((unit) => unit.edificio_id === edificioId)
+        : units,
+    [units, edificioId],
+  );
   const categories = useMemo(
     () => [
       ...new Set(
-        (claims || []).map(
+        scopedClaims.map(
           (claim) => claim.categoria || claim.category || "General",
         ),
       ),
     ],
-    [claims],
+    [scopedClaims],
   );
   const counts = useMemo(() => {
-    const openClaims = (claims || []).filter(
+    const openClaims = scopedClaims.filter(
       (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
     );
     return {
@@ -306,17 +333,17 @@ export default function ClaimsPanel() {
       curso: openClaims.filter(
         (claim) => (claim.estado || claim.status) === "en_curso",
       ).length,
-      cerrado: (claims || []).filter(
+      cerrado: scopedClaims.filter(
         (claim) => (claim.estado || claim.status) === "cerrado",
       ).length,
       urgente: openClaims.filter(
         (claim) => (claim.prioridad || claim.priority) === "Urgente",
       ).length,
     };
-  }, [claims]);
+  }, [scopedClaims]);
   const filteredClaims = useMemo(
     () =>
-      (claims || [])
+      scopedClaims
         .filter((claim) => {
           const categoryValue = claim.categoria || claim.category || "General";
           const text =
@@ -333,12 +360,12 @@ export default function ClaimsPanel() {
           (first, second) =>
             new Date(dateOf(second) || 0) - new Date(dateOf(first) || 0),
         ),
-    [categoryFilter, claims, priorityFilter, search],
+    [categoryFilter, scopedClaims, priorityFilter, search],
   );
   const visibleClaims = filteredClaims.filter(
     (claim) => (claim.estado || claim.status || "abierto") !== "cerrado",
   );
-  const historyClaims = (claims || [])
+  const historyClaims = scopedClaims
     .filter(
       (claim) => (claim.estado || claim.status || "abierto") === "cerrado",
     )
@@ -346,22 +373,30 @@ export default function ClaimsPanel() {
       (first, second) =>
         new Date(dateOf(second) || 0) - new Date(dateOf(first) || 0),
     );
-  const canCreateClaim = isAdmin || units.length > 0;
+  const canCreateClaim = scopedUnits.length > 0;
+  // Dentro de un edificio el título de la página es el del edificio.
+  const Heading = edificio ? "h2" : "h1";
 
   return (
     <section className="w-full max-w-6xl" aria-labelledby="claims-title">
       <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1
+          <Heading
             id="claims-title"
-            className="text-2xl font-semibold text-stone-900"
+            className={
+              edificio
+                ? "text-lg font-semibold text-stone-900"
+                : "text-2xl font-semibold text-stone-900"
+            }
           >
-            Reclamos
-          </h1>
+            {edificio ? "Reclamos del edificio" : "Reclamos"}
+          </Heading>
           <p className="mt-1 text-sm text-stone-500">
-            {isAdmin
-              ? "Todos los reclamos del consorcio"
-              : "Tus solicitudes de mantenimiento"}
+            {edificio
+              ? `Solo los reclamos de ${edificio.nombre}`
+              : isAdmin
+                ? "Todos los reclamos del consorcio"
+                : "Tus solicitudes de mantenimiento"}
           </p>
         </div>
         <button
@@ -371,7 +406,9 @@ export default function ClaimsPanel() {
           title={
             canCreateClaim
               ? "Crear un nuevo reclamo"
-              : "Necesitás una unidad asignada para crear un reclamo"
+              : isAdmin
+                ? "Cargá una unidad funcional para poder crear un reclamo"
+                : "Necesitás una unidad asignada para crear un reclamo"
           }
           className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
         >
@@ -461,6 +498,7 @@ export default function ClaimsPanel() {
             isAdmin={isAdmin}
             onPriorityChange={handlePriorityChange}
             pending={saving}
+            edificioId={edificioId}
           />
         )}
       </div>
@@ -489,6 +527,7 @@ export default function ClaimsPanel() {
               isAdmin={isAdmin}
               onPriorityChange={handlePriorityChange}
               pending={saving}
+              edificioId={edificioId}
             />
           )}
         </div>
@@ -591,7 +630,7 @@ export default function ClaimsPanel() {
                     className={inputClass}
                   >
                     <option value="">Seleccioná una unidad</option>
-                    {units.map((unit) => (
+                    {scopedUnits.map((unit) => (
                       <option key={unit.id} value={unit.id}>
                         {unit.identificador}
                       </option>
