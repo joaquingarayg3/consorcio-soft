@@ -14,7 +14,7 @@ export default function Reclamos() {
   return (
     <div className="min-h-dvh bg-stone-50">
       <AppHeader backTo="/home" />
-      <main className="mx-auto flex max-w-4xl justify-center px-4 py-8 sm:px-6">
+      <main className="mx-auto flex max-w-6xl justify-center px-4 py-8 sm:px-6 lg:px-8">
         <ClaimsPanel standalone />
       </main>
     </div>

@@ -13,7 +13,7 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const SELECT_FIELDS = `
   *,
-  unidad_funcional:unidad_funcional_id ( id, identificador, piso, edificio_id ),
+  unidad_funcional:unidad_funcional_id ( id, identificador, piso, edificio_id, edificio:edificio_id ( id, nombre ) ),
   reportante:reportante_id ( nombre, apellido, email ),
   cerrado_por:cerrado_por_id ( nombre, apellido )
 `;
@@ -307,7 +307,9 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
   if (isAdmin) {
     const { data, error } = await supabase
       .from("unidad_funcional")
-      .select("id, identificador, piso, edificio_id")
+      .select(
+        "id, identificador, piso, edificio_id, edificio:edificio_id ( nombre )",
+      )
       .order("identificador");
     if (error) throw error;
     return data ?? [];
@@ -316,7 +318,7 @@ export async function fetchMyUnidadesFuncionales(userId, isAdmin = false) {
   const { data: assignments, error: assignmentsError } = await supabase
     .from("unidad_usuarios")
     .select(
-      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso, edificio_id )",
+      "unidad_id, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso, edificio_id, edificio:edificio_id ( nombre ) )",
     )
     .eq("usuario_id", userId)
     .lte("fecha_desde", hoy());
