@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import supabase from "../../supabase-client";
 import ConfirmDialog from "../ConfirmDialog";
 import ModalForm, { ModalFormButton } from "../ModalForm";
+import AsignarUsuarioForm from "./AsignarUsuarioForm";
+import { fetchUsuariosPorIds } from "../../services/usuarios";
 import { asignacionVigente, hoy } from "../../utils/fechas";
 import { mensajeDeError } from "../../utils/supabase-errors";
 
@@ -14,13 +16,6 @@ function obtenerUnidades(edificioId) {
     )
     .eq("edificio_id", edificioId)
     .order("identificador");
-}
-
-function obtenerUsuarios() {
-  return supabase
-    .from("perfiles")
-    .select("id, nombre, apellido, email")
-    .order("nombre");
 }
 
 const inputClass =
@@ -39,10 +34,28 @@ function comoArray(valor) {
   return valor ? [valor] : [];
 }
 
+// Solo se piden los perfiles de quienes ya están asignados (para mostrar sus
+// nombres): con muchos usuarios no se puede traer a todos. A quién asignar se
+// busca desde el modal.
+async function cargarAsignados(unidades) {
+  const ids = new Set();
+  for (const unidad of unidades ?? []) {
+    for (const asignacion of comoArray(unidad.unidad_usuarios)) {
+      if (asignacionActiva(asignacion)) ids.add(asignacion.usuario_id);
+    }
+  }
+  try {
+    return await fetchUsuariosPorIds([...ids]);
+  } catch (error) {
+    console.error("No se pudieron cargar los usuarios asignados", error);
+    return [];
+  }
+}
+
 export default function UnidadesTab({ edificioId }) {
   const [unidades, setUnidades] = useState(null);
   const [unidadesError, setUnidadesError] = useState(null);
-  const [usuariosDisponibles, setUsuariosDisponibles] = useState([]);
+  const [usuariosAsignados, setUsuariosAsignados] = useState([]);
 
   const [formUnidadAbierto, setFormUnidadAbierto] = useState(false);
   const [identificador, setIdentificador] = useState("");
@@ -56,10 +69,13 @@ export default function UnidadesTab({ edificioId }) {
   const cierreUnidadRef = useRef(null);
 
   const [unidadAsignando, setUnidadAsignando] = useState(null);
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState("");
-  const [vinculo, setVinculo] = useState("propietario");
   const [asignando, setAsignando] = useState(false);
   const [asignarError, setAsignarError] = useState(null);
+  const [asignadoA, setAsignadoA] = useState(null);
+  const cierreAsignarRef = useRef(null);
+  // El compilador de React lee estas dependencias en cada render: con la
+  // ventana cerrada `unidadAsignando` es null, así que se toma el id acá.
+  const unidadAsignandoId = unidadAsignando?.id;
 
   const [accionPendiente, setAccionPendiente] = useState(null);
   const [confirmacion, setConfirmacion] = useState(null);
@@ -71,8 +87,8 @@ export default function UnidadesTab({ edificioId }) {
   const [editError, setEditError] = useState(null);
 
   const usuariosPorId = useMemo(
-    () => Object.fromEntries(usuariosDisponibles.map((u) => [u.id, u])),
-    [usuariosDisponibles],
+    () => Object.fromEntries(usuariosAsignados.map((u) => [u.id, u])),
+    [usuariosAsignados],
   );
 
   const totalPorcentajeFiscal = redondear(
@@ -88,17 +104,23 @@ export default function UnidadesTab({ edificioId }) {
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: unidadesData, error: unError }, { data: usuariosData }] =
-        await Promise.all([obtenerUnidades(edificioId), obtenerUsuarios()]);
+      const { data: unidadesData, error: unError } =
+        await obtenerUnidades(edificioId);
 
       if (unError) setUnidadesError(mensajeDeError(unError));
       setUnidades(unidadesData || []);
-      setUsuariosDisponibles(usuariosData || []);
+      setUsuariosAsignados(await cargarAsignados(unidadesData));
     }
     cargar();
   }, [edificioId]);
 
-  useEffect(() => () => clearTimeout(cierreUnidadRef.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(cierreUnidadRef.current);
+      clearTimeout(cierreAsignarRef.current);
+    },
+    [],
+  );
 
   async function refrescarUnidades() {
     const { data, error } = await obtenerUnidades(edificioId);
@@ -108,6 +130,7 @@ export default function UnidadesTab({ edificioId }) {
     }
     setUnidadesError(null);
     setUnidades(data);
+    setUsuariosAsignados(await cargarAsignados(data));
   }
 
   async function handleCrearUnidad(e) {
@@ -162,7 +185,6 @@ export default function UnidadesTab({ edificioId }) {
     setEditIdentificador(unidad.identificador);
     setEditPorcentaje(String(unidad.porcentaje_fiscal ?? 0));
     setEditError(null);
-    setUnidadAsignando(null);
   }
 
   async function handleGuardarEdicion(e, unidad) {
@@ -229,14 +251,26 @@ export default function UnidadesTab({ edificioId }) {
     refrescarUnidades();
   }
 
-  async function handleAsignarUsuario(e, unidadId) {
-    e.preventDefault();
+  function empezarAsignacion(unidad) {
+    setUnidadAsignando(unidad);
+    setAsignarError(null);
+    setAsignadoA(null);
+  }
+
+  function cerrarAsignacion() {
+    setUnidadAsignando(null);
+    setAsignarError(null);
+    setAsignadoA(null);
+  }
+
+  async function handleAsignarUsuario(usuarioId, vinculo, nombreCompleto) {
+    if (!unidadAsignandoId) return;
     setAsignando(true);
     setAsignarError(null);
 
     const { error } = await supabase.from("unidad_usuarios").insert({
-      unidad_id: unidadId,
-      usuario_id: usuarioSeleccionado,
+      unidad_id: unidadAsignandoId,
+      usuario_id: usuarioId,
       vinculo,
       fecha_desde: hoy(),
     });
@@ -248,10 +282,9 @@ export default function UnidadesTab({ edificioId }) {
       return;
     }
 
-    setUsuarioSeleccionado("");
-    setVinculo("propietario");
-    setUnidadAsignando(null);
     refrescarUnidades();
+    setAsignadoA(nombreCompleto || "El usuario");
+    cierreAsignarRef.current = setTimeout(cerrarAsignacion, 1400);
   }
 
   async function handleFinalizarAsignacion(asignacionId) {
@@ -427,6 +460,26 @@ export default function UnidadesTab({ edificioId }) {
         </form>
       </ModalForm>
 
+      <ModalForm
+        open={!!unidadAsignando}
+        onClose={cerrarAsignacion}
+        busy={asignando}
+        success={!!asignadoA}
+        successTitle="¡Usuario asignado!"
+        successMessage={`${asignadoA} ya está vinculado/a a ${
+          unidadAsignando?.identificador ?? "la unidad"
+        }.`}
+        title={`Asignar usuario a ${unidadAsignando?.identificador ?? ""}`}
+        description="Buscá a la persona y elegí su vínculo con la unidad."
+      >
+        <AsignarUsuarioForm
+          unidadId={unidadAsignandoId}
+          asignando={asignando}
+          error={asignarError}
+          onAsignar={handleAsignarUsuario}
+        />
+      </ModalForm>
+
       <div className="mt-4 grid gap-3 lg:grid-cols-2 lg:items-start">
         {unidades?.map((u) => {
           const asignacionesActivas = comoArray(u.unidad_usuarios).filter(
@@ -550,9 +603,7 @@ export default function UnidadesTab({ edificioId }) {
                     </button>
                     <button
                       type="button"
-                      onClick={() =>
-                        setUnidadAsignando((v) => (v === u.id ? null : u.id))
-                      }
+                      onClick={() => empezarAsignacion(u)}
                       className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100"
                     >
                       Asignar usuario
@@ -620,66 +671,6 @@ export default function UnidadesTab({ edificioId }) {
                     );
                   })}
                 </ul>
-              )}
-
-              {unidadAsignando === u.id && (
-                <form
-                  onSubmit={(e) => handleAsignarUsuario(e, u.id)}
-                  className="mt-3 flex flex-wrap items-end gap-2 border-t border-stone-100 pt-3"
-                >
-                  <div className="min-w-[10rem] flex-1">
-                    <label htmlFor={`usuario-${u.id}`} className={labelClass}>
-                      Usuario
-                    </label>
-                    <select
-                      id={`usuario-${u.id}`}
-                      required
-                      value={usuarioSeleccionado}
-                      onChange={(e) => setUsuarioSeleccionado(e.target.value)}
-                      disabled={asignando}
-                      className={inputClass}
-                    >
-                      <option value="" disabled>
-                        Elegí un usuario
-                      </option>
-                      {usuariosDisponibles.map((usr) => (
-                        <option key={usr.id} value={usr.id}>
-                          {usr.nombre} {usr.apellido} — {usr.email}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="w-40">
-                    <label htmlFor={`vinculo-${u.id}`} className={labelClass}>
-                      Vínculo
-                    </label>
-                    <select
-                      id={`vinculo-${u.id}`}
-                      value={vinculo}
-                      onChange={(e) => setVinculo(e.target.value)}
-                      disabled={asignando}
-                      className={inputClass}
-                    >
-                      <option value="propietario">Propietario</option>
-                      <option value="inquilino">Inquilino</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={asignando}
-                    className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
-                  >
-                    {asignando ? "Asignando..." : "Confirmar"}
-                  </button>
-                  {asignarError && (
-                    <div
-                      role="alert"
-                      className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                    >
-                      {asignarError}
-                    </div>
-                  )}
-                </form>
               )}
             </div>
           );

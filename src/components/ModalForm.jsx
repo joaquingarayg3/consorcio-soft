@@ -89,7 +89,9 @@ export default function ModalForm({
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    panelRef.current?.focus();
+    if (!panelRef.current?.contains(document.activeElement)) {
+      panelRef.current?.focus();
+    }
 
     function onKeyDown(event) {
       if (event.key === "Escape") {
