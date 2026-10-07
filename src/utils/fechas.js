@@ -22,3 +22,14 @@ export function formatearFechaHora(valor) {
     timeStyle: "short",
   });
 }
+
+// "5 oct 2026" a partir de una fecha "AAAA-MM-DD" (la de fecha_desde/hasta),
+// armada con día y mes locales para que la zona horaria no la corra un día.
+export function formatearFecha(valor) {
+  if (!valor) return "";
+  const [anio, mes, dia] = String(valor).slice(0, 10).split("-").map(Number);
+  if (!anio || !mes || !dia) return String(valor);
+  return new Date(anio, mes - 1, dia).toLocaleDateString("es-AR", {
+    dateStyle: "medium",
+  });
+}
