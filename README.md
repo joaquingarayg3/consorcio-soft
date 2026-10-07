@@ -57,6 +57,8 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20260924120500_reclamos_select_fila.sql` | La lectura de reclamos se evalúa con la propia fila: permite que un usuario común cree reclamos. |
 | `20261005120000_anuncios.sql` | Crea `anuncios` (por edificio) y `anuncio_lecturas` (qué leyó cada persona), con sus políticas RLS y permisos. |
 | `20261007120000_buscar_usuarios.sql` | Crea la función `buscar_perfiles_activos`, que busca usuarios activos ignorando tildes y mayúsculas (la usa el modal para asignar usuarios a una unidad). |
+| `20261007130000_buscar_perfiles_admin.sql` | Crea la función `buscar_perfiles`: listado de usuarios con búsqueda sin tildes, filtros por estado y rol, orden y paginado (la usa la pantalla de Usuarios). |
+| `20261008120000_eliminar_usuarios.sql` | Crea `eliminar_usuario_definitivo` (solo la llama la Edge Function): borra asignaciones, notificaciones y perfil de un usuario inactivo y desvincula —sin borrar— sus reclamos, comentarios, historial y anuncios. También hace que los triggers de reclamos acepten cambios de la clave de servicio. **Requiere volver a desplegar la función `admin-users`.** |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
 

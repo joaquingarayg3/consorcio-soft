@@ -194,6 +194,90 @@ Deno.serve(async (req) => {
       return json({ success: true }, 200, req);
     }
 
+    if (action === "delete") {
+      const { userId } = body;
+      if (typeof userId !== "string" || !UUID_RE.test(userId)) {
+        return json({ error: "Falta el id del usuario" }, 400, req);
+      }
+      if (userId === user.id) {
+        return json({ error: "No podés eliminar tu propia cuenta" }, 400, req);
+      }
+
+      const { data: objetivo, error: objetivoError } = await adminClient
+        .from("perfiles")
+        .select("id, activo")
+        .eq("id", userId)
+        .maybeSingle();
+      if (objetivoError) {
+        return json({ error: "No se pudo verificar el usuario" }, 500, req);
+      }
+
+      if (objetivo) {
+        // Se verifica acá aunque la pantalla ya lo exija: no se puede eliminar
+        // a alguien que sigue activo.
+        if (objetivo.activo !== false) {
+          return json(
+            {
+              error:
+                "Solo se puede eliminar un usuario inactivo. Dalo de baja primero.",
+            },
+            400,
+            req,
+          );
+        }
+
+        // Borra sus asignaciones, notificaciones y perfil, y desvincula (sin
+        // borrar) sus reclamos, comentarios y anuncios. Es una transacción:
+        // si falla, no se borra nada.
+        const { error: limpiezaError } = await adminClient.rpc(
+          "eliminar_usuario_definitivo",
+          { p_usuario: userId },
+        );
+        if (limpiezaError) {
+          console.error("admin-users delete (datos):", limpiezaError);
+          return json(
+            { error: "No se pudo eliminar el usuario. No se borró nada." },
+            500,
+            req,
+          );
+        }
+      } else {
+        // El perfil ya no está: un intento anterior borró los datos y quedó
+        // pendiente la cuenta de acceso. Solo se completa si sigue dada de baja.
+        const { data: cuenta, error: cuentaError } =
+          await adminClient.auth.admin.getUserById(userId);
+        if (cuentaError || !cuenta?.user) {
+          return json({ error: "El usuario no existe" }, 404, req);
+        }
+        const bloqueadoHasta = cuenta.user.banned_until
+          ? new Date(cuenta.user.banned_until)
+          : null;
+        if (!bloqueadoHasta || bloqueadoHasta <= new Date()) {
+          return json(
+            { error: "Solo se puede eliminar un usuario inactivo" },
+            400,
+            req,
+          );
+        }
+      }
+
+      const { error: cuentaError } =
+        await adminClient.auth.admin.deleteUser(userId);
+      if (cuentaError && !/not.?found/i.test(cuentaError.message)) {
+        console.error("admin-users delete (cuenta):", cuentaError);
+        return json(
+          {
+            error:
+              "Se borraron sus datos, pero no se pudo eliminar su cuenta de acceso (sigue dada de baja). Volvé a intentarlo.",
+          },
+          500,
+          req,
+        );
+      }
+
+      return json({ success: true }, 200, req);
+    }
+
     return json({ error: "Acción desconocida" }, 400, req);
   } catch (err) {
     // El detalle queda en los logs de la función, no en la respuesta.

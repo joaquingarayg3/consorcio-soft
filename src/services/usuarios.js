@@ -87,3 +87,64 @@ export async function fetchAsignacionesVigentes(usuarioIds) {
   }
   return porUsuario;
 }
+
+export const USUARIOS_POR_PAGINA = 50;
+
+const CAMPOS_LISTA = "id, nombre, apellido, email, rol, activo, created_at";
+
+// Listado de la pantalla de usuarios: búsqueda por texto + filtros + las
+// primeras `limite` filas y el total de coincidencias. Usa la función
+// buscar_perfiles (ignora tildes); si todavía no está aplicada en la base, se
+// busca con ilike, que sí distingue tildes pero funciona igual.
+export async function buscarPerfiles({
+  texto = "",
+  estado = "todos",
+  rol = "todos",
+  orden = "alfabetico",
+  limite = USUARIOS_POR_PAGINA,
+} = {}) {
+  const { data, error } = await supabase.rpc("buscar_perfiles", {
+    texto,
+    filtro_estado: estado,
+    filtro_rol: rol,
+    orden,
+    limite,
+    desde: 0,
+  });
+  if (!error) {
+    const filas = data ?? [];
+    return {
+      usuarios: filas.map((fila) => {
+        const perfil = { ...fila };
+        delete perfil.total;
+        return perfil;
+      }),
+      total: Number(filas[0]?.total ?? 0),
+    };
+  }
+  console.warn("buscar_perfiles no disponible", error);
+
+  let consulta = supabase
+    .from("perfiles")
+    .select(CAMPOS_LISTA, { count: "exact" });
+  if (estado === "activos") consulta = consulta.eq("activo", true);
+  if (estado === "inactivos") consulta = consulta.eq("activo", false);
+  if (rol !== "todos") consulta = consulta.eq("rol", rol);
+  for (const palabra of palabrasSeguras(texto)) {
+    consulta = consulta.or(
+      `nombre.ilike.%${palabra}%,apellido.ilike.%${palabra}%,email.ilike.%${palabra}%`,
+    );
+  }
+  consulta =
+    orden === "recientes"
+      ? consulta.order("created_at", { ascending: false })
+      : consulta.order("apellido").order("nombre");
+
+  const {
+    data: filas,
+    error: errorRespaldo,
+    count,
+  } = await consulta.range(0, limite - 1);
+  if (errorRespaldo) throw errorRespaldo;
+  return { usuarios: filas ?? [], total: count ?? (filas ?? []).length };
+}
