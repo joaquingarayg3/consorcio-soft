@@ -34,6 +34,29 @@ function comoArray(valor) {
   return valor ? [valor] : [];
 }
 
+// Número de piso para ordenar: "PB" y "planta baja" valen 0, los subsuelos son
+// negativos y lo que no tiene piso (o no se entiende) va al final.
+function numeroDePiso(piso) {
+  const texto = String(piso ?? "")
+    .trim()
+    .toLowerCase();
+  if (!texto) return Number.POSITIVE_INFINITY;
+  if (texto === "pb" || texto.startsWith("planta baja")) return 0;
+  if (texto === "ss" || texto.startsWith("subsuelo")) return -1;
+  const numero = Number.parseFloat(texto.replace(",", "."));
+  return Number.isFinite(numero) ? numero : Number.POSITIVE_INFINITY;
+}
+
+// De menor a mayor piso; a igual piso, por nombre ("2A" antes que "10A").
+function compararUnidades(a, b) {
+  const porPiso = numeroDePiso(a.piso) - numeroDePiso(b.piso);
+  if (porPiso !== 0 && !Number.isNaN(porPiso)) return porPiso;
+  return String(a.identificador).localeCompare(String(b.identificador), "es", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 // Solo se piden los perfiles de quienes ya están asignados (para mostrar sus
 // nombres): con muchos usuarios no se puede traer a todos. A quién asignar se
 // busca desde el modal.
@@ -89,6 +112,11 @@ export default function UnidadesTab({ edificioId }) {
   const usuariosPorId = useMemo(
     () => Object.fromEntries(usuariosAsignados.map((u) => [u.id, u])),
     [usuariosAsignados],
+  );
+
+  const unidadesOrdenadas = useMemo(
+    () => (unidades ? [...unidades].sort(compararUnidades) : unidades),
+    [unidades],
   );
 
   const totalPorcentajeFiscal = redondear(
@@ -480,8 +508,8 @@ export default function UnidadesTab({ edificioId }) {
         />
       </ModalForm>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2 lg:items-start">
-        {unidades?.map((u) => {
+      <div className="mt-4 space-y-3">
+        {unidadesOrdenadas?.map((u) => {
           const asignacionesActivas = comoArray(u.unidad_usuarios).filter(
             asignacionActiva,
           );
@@ -580,7 +608,9 @@ export default function UnidadesTab({ edificioId }) {
                       {u.identificador}{" "}
                       <span className="font-normal text-stone-500">
                         · {u.tipo}
-                        {u.piso ? ` · piso ${u.piso}` : ""}
+                        {String(u.piso ?? "").trim()
+                          ? ` · piso ${String(u.piso).trim()}`
+                          : ""}
                       </span>
                     </p>
                     {(u.superficie_m2 || u.porcentaje_fiscal) && (
@@ -676,7 +706,7 @@ export default function UnidadesTab({ edificioId }) {
           );
         })}
         {unidades?.length === 0 && (
-          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center lg:col-span-2 text-sm text-stone-500 shadow-sm">
+          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center text-sm text-stone-500 shadow-sm">
             Todavía no hay unidades cargadas en este edificio.
           </p>
         )}
