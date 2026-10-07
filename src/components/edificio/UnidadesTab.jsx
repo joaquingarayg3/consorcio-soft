@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import supabase from "../../supabase-client";
 import ConfirmDialog from "../ConfirmDialog";
+import ModalForm, { ModalFormButton } from "../ModalForm";
 import { asignacionVigente, hoy } from "../../utils/fechas";
 import { mensajeDeError } from "../../utils/supabase-errors";
 
@@ -51,6 +52,8 @@ export default function UnidadesTab({ edificioId }) {
   const [porcentajeFiscal, setPorcentajeFiscal] = useState("");
   const [creandoUnidad, setCreandoUnidad] = useState(false);
   const [unidadFormError, setUnidadFormError] = useState(null);
+  const [unidadCreadaOk, setUnidadCreadaOk] = useState(false);
+  const cierreUnidadRef = useRef(null);
 
   const [unidadAsignando, setUnidadAsignando] = useState(null);
   const [usuarioSeleccionado, setUsuarioSeleccionado] = useState("");
@@ -95,6 +98,8 @@ export default function UnidadesTab({ edificioId }) {
     cargar();
   }, [edificioId]);
 
+  useEffect(() => () => clearTimeout(cierreUnidadRef.current), []);
+
   async function refrescarUnidades() {
     const { data, error } = await obtenerUnidades(edificioId);
     if (error) {
@@ -131,17 +136,25 @@ export default function UnidadesTab({ edificioId }) {
     setCreandoUnidad(false);
 
     if (error) {
-      setUnidadFormError(mensajeDeError(error));
+      setUnidadFormError(
+        error.code === "23505"
+          ? "Ya hay una unidad con ese nombre en este edificio."
+          : mensajeDeError(error),
+      );
       return;
     }
 
-    setIdentificador("");
-    setPiso("");
-    setTipo("departamento");
-    setSuperficieM2("");
-    setPorcentajeFiscal("");
-    setFormUnidadAbierto(false);
     refrescarUnidades();
+    setUnidadCreadaOk(true);
+    cierreUnidadRef.current = setTimeout(() => {
+      setFormUnidadAbierto(false);
+      setUnidadCreadaOk(false);
+      setIdentificador("");
+      setPiso("");
+      setTipo("departamento");
+      setSuperficieM2("");
+      setPorcentajeFiscal("");
+    }, 1400);
   }
 
   function empezarEdicion(unidad) {
@@ -289,18 +302,27 @@ export default function UnidadesTab({ edificioId }) {
         </div>
         <button
           type="button"
-          onClick={() => setFormUnidadAbierto((v) => !v)}
+          onClick={() => setFormUnidadAbierto(true)}
           className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900"
         >
-          {formUnidadAbierto ? "Cancelar" : "+ Nueva unidad"}
+          + Nueva unidad
         </button>
       </div>
 
-      {formUnidadAbierto && (
-        <form
-          onSubmit={handleCrearUnidad}
-          className="mt-4 space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
-        >
+      <ModalForm
+        open={formUnidadAbierto}
+        onClose={() => {
+          setFormUnidadAbierto(false);
+          setUnidadFormError(null);
+        }}
+        busy={creandoUnidad}
+        success={unidadCreadaOk}
+        successTitle="¡Unidad creada!"
+        successMessage={`${identificador} ya está en la lista de unidades.`}
+        title="Nueva unidad"
+        description={`% fiscal disponible para repartir: ${disponiblePorcentajeFiscal}%.`}
+      >
+        <form onSubmit={handleCrearUnidad} className="space-y-4">
           <div className="flex gap-3">
             <div className="flex-1">
               <label htmlFor="identificador" className={labelClass}>
@@ -388,13 +410,11 @@ export default function UnidadesTab({ edificioId }) {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={creandoUnidad}
-            className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
-          >
-            {creandoUnidad ? "Creando..." : "Crear unidad"}
-          </button>
+          <ModalFormButton
+            loading={creandoUnidad}
+            label="Crear unidad"
+            loadingLabel="Creando..."
+          />
 
           {unidadFormError && (
             <div
@@ -405,9 +425,9 @@ export default function UnidadesTab({ edificioId }) {
             </div>
           )}
         </form>
-      )}
+      </ModalForm>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 grid gap-3 lg:grid-cols-2 lg:items-start">
         {unidades?.map((u) => {
           const asignacionesActivas = comoArray(u.unidad_usuarios).filter(
             asignacionActiva,
@@ -665,7 +685,7 @@ export default function UnidadesTab({ edificioId }) {
           );
         })}
         {unidades?.length === 0 && (
-          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center text-sm text-stone-500 shadow-sm">
+          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-6 text-center lg:col-span-2 text-sm text-stone-500 shadow-sm">
             Todavía no hay unidades cargadas en este edificio.
           </p>
         )}

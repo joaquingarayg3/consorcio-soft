@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
-import PopoverForm, { PopoverFormButton } from "../components/PopoverForm";
+import ModalForm, { ModalFormButton } from "../components/ModalForm";
 import {
   getAdminFunctionErrorMessage,
   mensajeDeError,
@@ -223,12 +223,12 @@ export default function AdminUsuarios() {
           <button
             type="button"
             onClick={() => {
-              setFormAbierto((v) => !v);
+              setFormAbierto(true);
               setCredencialesCreadas(null);
             }}
             className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
           >
-            {formAbierto ? "Cancelar" : "+ Nuevo usuario"}
+            + Nuevo usuario
           </button>
         </div>
 
@@ -249,7 +249,16 @@ export default function AdminUsuarios() {
           </div>
         )}
 
-        <PopoverForm open={formAbierto} title="Nuevo usuario">
+        <ModalForm
+          open={formAbierto}
+          onClose={() => {
+            setFormAbierto(false);
+            setFormError(null);
+          }}
+          busy={creando}
+          title="Nuevo usuario"
+          description="Completá los datos para dar de alta a la persona."
+        >
           <form onSubmit={handleCrearUsuario} className="space-y-4">
             <div className="flex gap-3">
               <div className="flex-1">
@@ -440,7 +449,7 @@ export default function AdminUsuarios() {
               </select>
             </div>
 
-            <PopoverFormButton
+            <ModalFormButton
               loading={creando}
               label="Crear usuario"
               loadingLabel="Creando..."
@@ -455,7 +464,7 @@ export default function AdminUsuarios() {
               </div>
             )}
           </form>
-        </PopoverForm>
+        </ModalForm>
 
         {/* Mobile: tarjetas apiladas */}
         <div className="mt-6 space-y-3 sm:hidden">

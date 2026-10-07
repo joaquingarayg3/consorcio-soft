@@ -7,7 +7,7 @@ import {
   fetchMyUnidadesFuncionales,
   updateClaimPriority,
 } from "../services/claims";
-import { PopoverFormButton } from "./PopoverForm";
+import { ModalFormButton } from "./ModalForm";
 import { mensajeDeError } from "../utils/supabase-errors";
 
 const inputClass =
@@ -726,7 +726,7 @@ export default function ClaimsPanel({ edificio = null }) {
                   Cancelar
                 </button>
                 <div className="sm:w-48">
-                  <PopoverFormButton
+                  <ModalFormButton
                     loading={saving}
                     label="Crear reclamo"
                     loadingLabel="Subiendo fotos..."

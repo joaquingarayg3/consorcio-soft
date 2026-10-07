@@ -121,20 +121,10 @@ export default function AdminEdificioDetalle() {
 
             <div className="mt-5">
               {tab === "reclamos" && <ClaimsPanel edificio={edificio} />}
-              {tab === "unidades" && (
-                <div className="max-w-4xl">
-                  <UnidadesTab edificioId={edificio.id} />
-                </div>
-              )}
-              {tab === "anuncios" && (
-                <div className="max-w-4xl">
-                  <AnunciosTab edificio={edificio} />
-                </div>
-              )}
+              {tab === "unidades" && <UnidadesTab edificioId={edificio.id} />}
+              {tab === "anuncios" && <AnunciosTab edificio={edificio} />}
               {tab === "datos" && (
-                <div className="max-w-2xl">
-                  <DatosTab edificio={edificio} onSaved={setEdificio} />
-                </div>
+                <DatosTab edificio={edificio} onSaved={setEdificio} />
               )}
             </div>
           </>

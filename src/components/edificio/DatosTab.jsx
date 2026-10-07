@@ -50,9 +50,9 @@ export default function DatosTab({ edificio, onSaved }) {
   return (
     <form
       onSubmit={handleGuardar}
-      className="space-y-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
+      className="grid gap-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm lg:grid-cols-2 lg:gap-x-6"
     >
-      <h2 className="text-lg font-semibold text-stone-900">
+      <h2 className="text-lg font-semibold text-stone-900 lg:col-span-2">
         Datos del edificio
       </h2>
 
@@ -86,7 +86,7 @@ export default function DatosTab({ edificio, onSaved }) {
         />
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 lg:col-span-2">
         <div className="flex-1">
           <label htmlFor="ciudad" className={labelClass}>
             Ciudad
@@ -132,7 +132,7 @@ export default function DatosTab({ edificio, onSaved }) {
       <button
         type="submit"
         disabled={guardando}
-        className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
+        className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold lg:col-span-2 lg:w-auto lg:justify-self-end lg:px-8 text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
       >
         {guardando ? "Guardando..." : "Guardar cambios"}
       </button>
@@ -140,7 +140,7 @@ export default function DatosTab({ edificio, onSaved }) {
       {guardadoError && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 lg:col-span-2"
         >
           {guardadoError}
         </div>
@@ -148,7 +148,7 @@ export default function DatosTab({ edificio, onSaved }) {
       {guardadoOk && (
         <div
           role="status"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 lg:col-span-2"
         >
           Cambios guardados.
         </div>

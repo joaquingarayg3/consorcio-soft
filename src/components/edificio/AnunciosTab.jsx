@@ -9,7 +9,7 @@ import {
 import { formatearFechaHora } from "../../utils/fechas";
 import { mensajeDeError } from "../../utils/supabase-errors";
 import ConfirmDialog from "../ConfirmDialog";
-import PopoverForm, { PopoverFormButton } from "../PopoverForm";
+import ModalForm, { ModalFormButton } from "../ModalForm";
 
 const MAX_TITULO = 120;
 const MAX_CONTENIDO = 4000;
@@ -154,15 +154,20 @@ export default function AnunciosTab({ edificio }) {
         </div>
         <button
           type="button"
-          onClick={() => setFormAbierto((v) => !v)}
+          onClick={() => setFormAbierto(true)}
           className="w-full shrink-0 whitespace-nowrap rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
         >
-          {formAbierto ? "Cancelar" : "+ Nuevo anuncio"}
+          + Nuevo anuncio
         </button>
       </div>
 
-      <PopoverForm
+      <ModalForm
         open={formAbierto}
+        onClose={() => {
+          setFormAbierto(false);
+          setFormError(null);
+        }}
+        busy={publicando}
         success={publicadoOk}
         successTitle="¡Anuncio publicado!"
         successMessage={`Los vecinos de ${edificio.nombre} ya pueden verlo.`}
@@ -207,7 +212,7 @@ export default function AnunciosTab({ edificio }) {
               className={inputClass}
             />
           </div>
-          <PopoverFormButton
+          <ModalFormButton
             loading={publicando}
             label="Publicar anuncio"
             loadingLabel="Publicando..."
@@ -221,7 +226,7 @@ export default function AnunciosTab({ edificio }) {
             </div>
           )}
         </form>
-      </PopoverForm>
+      </ModalForm>
 
       {listaError && (
         <div
@@ -236,13 +241,13 @@ export default function AnunciosTab({ edificio }) {
         <p className="mt-6 text-sm text-stone-500">Cargando anuncios...</p>
       )}
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 grid gap-3 lg:grid-cols-2 lg:items-start">
         {anuncios?.map((anuncio) =>
           editandoId === anuncio.id ? (
             <form
               key={anuncio.id}
               onSubmit={handleGuardarEdicion}
-              className="space-y-3 rounded-2xl border border-amber-300 bg-white p-4 shadow-sm sm:p-5"
+              className="space-y-3 rounded-2xl border border-amber-300 lg:col-span-2 bg-white p-4 shadow-sm sm:p-5"
             >
               <div>
                 <div className="flex items-baseline justify-between">
@@ -344,7 +349,7 @@ export default function AnunciosTab({ edificio }) {
           ),
         )}
         {anuncios?.length === 0 && !listaError && (
-          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-8 text-center text-sm text-stone-500 shadow-sm">
+          <p className="rounded-2xl border border-stone-200 bg-white px-4 py-8 text-center lg:col-span-2 text-sm text-stone-500 shadow-sm">
             Todavía no publicaste anuncios en este edificio.
           </p>
         )}
