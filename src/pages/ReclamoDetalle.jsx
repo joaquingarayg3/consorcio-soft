@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation, useParams, useSearch } from "wouter";
 import AppHeader from "../components/AppHeader";
+import SegmentedControl from "../components/SegmentedControl";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   addClaimComment,
@@ -17,7 +18,54 @@ const statusLabels = {
   en_curso: "En curso",
   cerrado: "Cerrado",
 };
-const priorities = ["Baja", "Media", "Alta", "Urgente"];
+
+const ESTADOS = [
+  {
+    value: "abierto",
+    label: "Activo",
+    activa: "bg-amber-100 text-amber-900 ring-1 ring-amber-300",
+    punto: "bg-amber-500",
+  },
+  {
+    value: "en_curso",
+    label: "En curso",
+    activa: "bg-blue-100 text-blue-800 ring-1 ring-blue-300",
+    punto: "bg-blue-500",
+  },
+  {
+    value: "cerrado",
+    label: "Cerrado",
+    activa: "bg-green-100 text-green-800 ring-1 ring-green-300",
+    punto: "bg-green-500",
+  },
+];
+
+const PRIORIDADES = [
+  {
+    value: "Baja",
+    label: "Baja",
+    activa: "bg-white text-stone-800 ring-1 ring-stone-300",
+    punto: "bg-stone-400",
+  },
+  {
+    value: "Media",
+    label: "Media",
+    activa: "bg-amber-100 text-amber-900 ring-1 ring-amber-300",
+    punto: "bg-amber-500",
+  },
+  {
+    value: "Alta",
+    label: "Alta",
+    activa: "bg-orange-100 text-orange-800 ring-1 ring-orange-300",
+    punto: "bg-orange-500",
+  },
+  {
+    value: "Urgente",
+    label: "Urgente",
+    activa: "bg-red-100 text-red-800 ring-1 ring-red-300",
+    punto: "bg-red-500",
+  },
+];
 
 function claimStatus(claim) {
   return claim?.estado || claim?.status || "abierto";
@@ -140,6 +188,7 @@ export default function ReclamoDetalle() {
   const status = claimStatus(claim);
   const priority = claim?.prioridad || claim?.priority || "Media";
   const imageUrls = claim?.imagen_urls || claim?.image_urls || [];
+  const hayCambios = draftStatus !== status || draftPriority !== priority;
   const authorName = (commentItem) => {
     const author = commentItem.autor || commentItem.author;
     return author
@@ -287,45 +336,49 @@ export default function ReclamoDetalle() {
                   <p className="mb-3 text-[10px] font-medium uppercase tracking-wide text-stone-400">
                     Gestión del reclamo
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <select
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <SegmentedControl
+                      legend="Estado"
                       value={draftStatus}
+                      onChange={setDraftStatus}
+                      options={ESTADOS}
                       disabled={saving}
-                      onChange={(event) => setDraftStatus(event.target.value)}
-                      className={inputClass + " sm:w-auto"}
-                    >
-                      <option value="abierto">Activo</option>
-                      <option value="en_curso">En curso</option>
-                      <option value="cerrado">Cerrado</option>
-                    </select>
-                    <select
+                    />
+                    <SegmentedControl
+                      legend="Prioridad"
                       value={draftPriority}
+                      onChange={setDraftPriority}
+                      options={PRIORIDADES}
                       disabled={saving}
-                      onChange={(event) => setDraftPriority(event.target.value)}
-                      className={inputClass + " sm:w-auto"}
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      disabled={saving || !hayCambios}
+                      onClick={handleSaveChanges}
+                      className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
                     >
-                      {priorities.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                    <div className="flex w-full flex-wrap gap-2 pt-1">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={handleSaveChanges}
-                        className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {saving ? "Guardando..." : "Guardar cambios"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={handleDiscardChanges}
-                        className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Descartar cambios
-                      </button>
-                    </div>
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                    {hayCambios && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={handleDiscardChanges}
+                          className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Descartar cambios
+                        </button>
+                        <p
+                          role="status"
+                          className="text-sm text-amber-800 sm:ml-1"
+                        >
+                          Tenés cambios sin guardar.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
