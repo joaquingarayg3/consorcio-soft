@@ -1,12 +1,35 @@
 import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import AppHeader from "../components/AppHeader";
+import imagenEdificios from "../assets/home/edificios.jpg";
+import imagenReclamos from "../assets/home/reclamos.jpg";
+import imagenUsuarios from "../assets/home/usuarios.jpg";
+
+// Mismo ancho para la bienvenida y las secciones: en pantallas grandes el
+// contenido se abre para aprovechar el espacio; hasta tablet queda como estaba.
+const ANCHO = "max-w-md sm:max-w-2xl lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl";
+
+const iconoReclamos = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-6 w-6"
+  >
+    <path d="M9 4.5h6M9 3h6a1.5 1.5 0 0 1 1.5 1.5v.5h1A1.5 1.5 0 0 1 19 6.5v14A1.5 1.5 0 0 1 17.5 22h-11A1.5 1.5 0 0 1 5 20.5v-14A1.5 1.5 0 0 1 6.5 5h1v-.5A1.5 1.5 0 0 1 9 3Z" />
+    <path d="m8 13 2 2 5-5" />
+  </svg>
+);
 
 const accesos = [
   {
     href: "/admin/edificios",
     titulo: "Edificios",
     descripcion: "Propiedades y unidades funcionales",
+    imagen: imagenEdificios,
     icono: (
       <svg
         viewBox="0 0 24 24"
@@ -27,6 +50,7 @@ const accesos = [
     href: "/admin/usuarios",
     titulo: "Usuarios",
     descripcion: "Altas, bajas y perfiles",
+    imagen: imagenUsuarios,
     icono: (
       <svg
         viewBox="0 0 24 24"
@@ -46,24 +70,21 @@ const accesos = [
   },
   {
     href: "/reclamos",
-    titulo: "Reclamos",
-    descripcion: "Solicitudes y mantenimiento",
-    icono: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-6 w-6"
-      >
-        <path d="M9 4.5h6M9 3h6a1.5 1.5 0 0 1 1.5 1.5v.5h1A1.5 1.5 0 0 1 19 6.5v14A1.5 1.5 0 0 1 17.5 22h-11A1.5 1.5 0 0 1 5 20.5v-14A1.5 1.5 0 0 1 6.5 5h1v-.5A1.5 1.5 0 0 1 9 3Z" />
-        <path d="m8 13 2 2 5-5" />
-      </svg>
-    ),
+    titulo: "Reclamos generales",
+    descripcion: "Todos los edificios en un lugar",
+    imagen: imagenReclamos,
+    posicionImagen: "object-top",
+    icono: iconoReclamos,
   },
 ];
+
+// Para el vecino son "sus" reclamos, sin foto: su vista no cambia.
+const accesoReclamosVecino = {
+  href: "/reclamos",
+  titulo: "Reclamos",
+  descripcion: "Solicitudes y mantenimiento",
+  icono: iconoReclamos,
+};
 
 const accesoAnuncios = {
   href: "/anuncios",
@@ -85,34 +106,77 @@ const accesoAnuncios = {
   ),
 };
 
+// Con `imagen`: hasta tablet es la misma fila de siempre (la foto ocupa el
+// lugar del ícono); desde `lg` pasa a tarjeta vertical con la foto arriba.
 function AccesoCard({ acceso }) {
+  const conImagen = Boolean(acceso.imagen);
+
   return (
     <Link
       href={acceso.href}
-      className="group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+      className={`group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+        conImagen
+          ? "lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:p-0 lg:hover:-translate-y-1 lg:active:scale-100"
+          : ""
+      }`}
     >
       <div
         aria-hidden="true"
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
+        className={`relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-amber-100 text-amber-700 ${
+          conImagen ? "lg:h-56 lg:w-full lg:rounded-none xl:h-64" : ""
+        }`}
       >
-        {acceso.icono}
+        {conImagen ? (
+          <>
+            <img
+              src={acceso.imagen}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className={`absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100 ${acceso.posicionImagen ?? "object-center"}`}
+            />
+            <span className="absolute bottom-3 left-3 hidden h-11 w-11 items-center justify-center rounded-xl bg-white/95 text-amber-700 shadow-sm lg:flex">
+              {acceso.icono}
+            </span>
+          </>
+        ) : (
+          acceso.icono
+        )}
       </div>
-      <div className="min-w-0 flex-1 text-left">
-        <p className="font-semibold text-stone-900">{acceso.titulo}</p>
-        <p className="truncate text-sm text-stone-500">{acceso.descripcion}</p>
-      </div>
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
+      <div
+        className={`flex min-w-0 flex-1 items-center gap-4 ${
+          conImagen ? "lg:p-6" : ""
+        }`}
       >
-        <path d="m9 18 6-6-6-6" />
-      </svg>
+        <div className="min-w-0 flex-1 text-left">
+          <p
+            className={`font-semibold text-stone-900 ${
+              conImagen ? "lg:text-lg" : ""
+            }`}
+          >
+            {acceso.titulo}
+          </p>
+          <p
+            className={`truncate text-sm text-stone-500 ${
+              conImagen ? "lg:whitespace-normal" : ""
+            }`}
+          >
+            {acceso.descripcion}
+          </p>
+        </div>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </div>
     </Link>
   );
 }
@@ -125,8 +189,10 @@ export default function Home() {
     <div className="min-h-dvh bg-stone-50">
       <AppHeader />
 
-      <main className="flex flex-col items-center px-4 py-8 sm:px-6 sm:py-12">
-        <div className="flex w-full max-w-md items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm sm:max-w-2xl">
+      <main className="flex flex-col items-center px-4 py-8 sm:px-6 sm:py-12 lg:px-10 lg:py-16">
+        <div
+          className={`flex w-full ${ANCHO} items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:p-6`}
+        >
           <div
             aria-hidden="true"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
@@ -157,11 +223,11 @@ export default function Home() {
         </div>
 
         {perfil?.rol === "admin" && (
-          <div className="mt-6 w-full max-w-md sm:max-w-2xl">
+          <div className={`mt-6 w-full ${ANCHO} lg:mt-12`}>
             <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
               Panel de administración
             </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3 lg:gap-6 xl:gap-8">
               {accesos.map((a) => (
                 <AccesoCard key={a.href} acceso={a} />
               ))}
@@ -171,12 +237,12 @@ export default function Home() {
 
         {/* undefined = el perfil todavía carga: no mostrar la vista equivocada */}
         {perfil !== undefined && perfil?.rol !== "admin" && (
-          <div className="mt-6 w-full max-w-md sm:max-w-2xl">
+          <div className={`mt-6 w-full ${ANCHO} lg:mt-12`}>
             <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
               Accesos
             </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <AccesoCard acceso={accesos[2]} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:gap-6 xl:gap-8">
+              <AccesoCard acceso={accesoReclamosVecino} />
               <AccesoCard acceso={accesoAnuncios} />
             </div>
           </div>
