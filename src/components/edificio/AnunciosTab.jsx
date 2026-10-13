@@ -14,6 +14,7 @@ import {
   urgenteHastaDesdeCampo,
 } from "../../utils/anuncios";
 import { formatearFechaHora } from "../../utils/fechas";
+import { urlWhatsApp } from "../../utils/whatsapp";
 import { mensajeDeError } from "../../utils/supabase-errors";
 import ConfirmDialog from "../ConfirmDialog";
 import ModalForm, { ModalFormButton } from "../ModalForm";
@@ -25,6 +26,30 @@ const MAX_CONTENIDO = 4000;
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
+
+const CLAVE_COMPARTIR = "anuncios-abrir-whatsapp";
+
+// Abrir WhatsApp al publicar viene activado; si se desactiva, se recuerda.
+function leerCompartir() {
+  try {
+    return localStorage.getItem(CLAVE_COMPARTIR) !== "no";
+  } catch {
+    return true;
+  }
+}
+
+function IconoWhatsApp({ className = "h-4 w-4" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+    >
+      <path d="M12.04 2a9.9 9.9 0 0 0-8.5 14.9L2 22l5.25-1.38A9.9 9.9 0 1 0 12.04 2Zm0 1.8a8.1 8.1 0 1 1-4.13 15.07l-.3-.18-3.1.82.83-3.03-.2-.31A8.1 8.1 0 0 1 12.04 3.8Zm-3.2 3.9c-.18 0-.47.07-.72.34-.25.27-.95.93-.95 2.27s.97 2.63 1.1 2.81c.14.18 1.9 3.03 4.7 4.13 2.32.91 2.8.73 3.3.68.5-.04 1.62-.66 1.85-1.3.23-.64.23-1.19.16-1.3-.07-.12-.25-.18-.52-.32-.27-.14-1.62-.8-1.87-.89-.25-.09-.43-.14-.61.14-.18.27-.7.89-.86 1.07-.16.18-.32.2-.59.07-.27-.14-1.16-.43-2.2-1.36-.81-.72-1.36-1.62-1.52-1.89-.16-.27-.02-.42.12-.55.12-.12.27-.32.41-.48.14-.16.18-.27.27-.45.09-.18.05-.34-.02-.48-.07-.14-.6-1.5-.84-2.05-.22-.5-.45-.51-.61-.52h-.52Z" />
+    </svg>
+  );
+}
 
 function Contador({ valor, maximo }) {
   return (
@@ -48,6 +73,10 @@ export default function AnunciosTab({ edificio }) {
   const [urgencia, setUrgencia] = useState(URGENCIA_VACIA);
   const [publicando, setPublicando] = useState(false);
   const [publicadoOk, setPublicadoOk] = useState(false);
+  const [compartir, setCompartir] = useState(leerCompartir);
+  const [abrioWhatsapp, setAbrioWhatsapp] = useState(false);
+  // Si el navegador no dejó abrir la pestaña, el enlace queda acá para tocarlo.
+  const [enlaceWhatsapp, setEnlaceWhatsapp] = useState(null);
   const [formError, setFormError] = useState(null);
   const cierreRef = useRef(null);
 
@@ -98,7 +127,15 @@ export default function AnunciosTab({ edificio }) {
       setFormError(urgenciaError);
       return;
     }
+
+    // La pestaña de WhatsApp se abre ahora, dentro del clic: si se abriera recién
+    // cuando la base responde, el navegador la bloquearía como ventana emergente.
+    // Más abajo se completa con el mensaje.
+    const ventana = compartir ? window.open("about:blank", "_blank") : null;
+    if (ventana) ventana.opener = null;
+
     setPublicando(true);
+    setEnlaceWhatsapp(null);
     try {
       const nuevo = await crearAnuncio({
         edificioId: edificio.id,
@@ -108,6 +145,15 @@ export default function AnunciosTab({ edificio }) {
         urgenteHasta,
       });
       setAnuncios((actuales) => [nuevo, ...(actuales || [])]);
+      if (compartir) {
+        const url = urlWhatsApp(nuevo.titulo, nuevo.contenido);
+        if (ventana) {
+          ventana.location.href = url;
+        } else {
+          setEnlaceWhatsapp(url);
+        }
+      }
+      setAbrioWhatsapp(Boolean(compartir && ventana));
       setPublicadoOk(true);
       cierreRef.current = setTimeout(() => {
         setFormAbierto(false);
@@ -117,6 +163,8 @@ export default function AnunciosTab({ edificio }) {
         setUrgencia(URGENCIA_VACIA);
       }, 1400);
     } catch (error) {
+      // Si no se pudo publicar, no hay nada para enviar: se cierra la pestaña.
+      ventana?.close();
       setFormError(mensajeDeError(error, "No se pudo publicar el anuncio."));
     } finally {
       setPublicando(false);
@@ -203,7 +251,9 @@ export default function AnunciosTab({ edificio }) {
         busy={publicando}
         success={publicadoOk}
         successTitle="¡Anuncio publicado!"
-        successMessage={`Los vecinos de ${edificio.nombre} ya pueden verlo.`}
+        successMessage={`Los vecinos de ${edificio.nombre} ya pueden verlo.${
+          abrioWhatsapp ? " Se abrió WhatsApp para enviarlo." : ""
+        }`}
         title="Nuevo anuncio"
       >
         <form onSubmit={handlePublicar} className="space-y-4">
@@ -253,9 +303,43 @@ export default function AnunciosTab({ edificio }) {
             otrosUrgentes={urgentesVigentes}
             disabled={publicando}
           />
+          <label
+            htmlFor="anuncio-whatsapp"
+            className="flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 p-3"
+          >
+            <input
+              id="anuncio-whatsapp"
+              type="checkbox"
+              checked={compartir}
+              disabled={publicando}
+              onChange={(e) => {
+                setCompartir(e.target.checked);
+                try {
+                  localStorage.setItem(
+                    CLAVE_COMPARTIR,
+                    e.target.checked ? "si" : "no",
+                  );
+                } catch {
+                  // sin almacenamiento: no se recuerda la elección
+                }
+              }}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-stone-300 accent-brand-700"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-stone-900">
+                Abrir WhatsApp al publicar
+              </span>
+              <span className="block text-xs text-stone-500">
+                Se abre en una pestaña nueva con el título y el mensaje, listo
+                para que elijas a quién enviarlo.
+              </span>
+            </span>
+          </label>
           <ModalFormButton
             loading={publicando}
-            label="Publicar anuncio"
+            label={
+              compartir ? "Publicar y enviar por WhatsApp" : "Publicar anuncio"
+            }
             loadingLabel="Publicando..."
           />
           {formError && (
@@ -268,6 +352,38 @@ export default function AnunciosTab({ edificio }) {
           )}
         </form>
       </ModalForm>
+
+      {enlaceWhatsapp && (
+        <div
+          role="status"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900"
+        >
+          <p>
+            El navegador no dejó abrir WhatsApp solo. Tocá el botón para enviar
+            el anuncio.
+          </p>
+          <div className="flex items-center gap-2">
+            <a
+              href={enlaceWhatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setEnlaceWhatsapp(null)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700/50"
+            >
+              <IconoWhatsApp />
+              Abrir WhatsApp
+            </a>
+            <button
+              type="button"
+              onClick={() => setEnlaceWhatsapp(null)}
+              aria-label="Cerrar aviso"
+              className="rounded px-1.5 text-lg leading-none text-green-800 hover:bg-green-100"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {listaError && (
         <div
@@ -389,7 +505,16 @@ export default function AnunciosTab({ edificio }) {
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <a
+                    href={urlWhatsApp(anuncio.titulo, anuncio.contenido)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-800 transition-colors hover:bg-green-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-700/40"
+                  >
+                    <IconoWhatsApp className="h-3.5 w-3.5" />
+                    WhatsApp
+                  </a>
                   <button
                     type="button"
                     onClick={() => empezarEdicion(anuncio)}
