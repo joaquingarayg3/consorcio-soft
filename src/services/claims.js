@@ -13,7 +13,7 @@ const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const SELECT_FIELDS = `
   *,
-  unidad_funcional:unidad_funcional_id ( id, identificador, piso, edificio_id, edificio:edificio_id ( id, nombre ) ),
+  unidad_funcional:unidad_funcional_id ( id, identificador, piso, edificio_id, edificio:edificio_id ( id, nombre, codigo ) ),
   reportante:reportante_id ( nombre, apellido, email ),
   cerrado_por:cerrado_por_id ( nombre, apellido )
 `;
@@ -233,7 +233,7 @@ export async function fetchUserNotifications(userId) {
   const { data, error } = await supabase
     .from("usuario_notificaciones")
     .select(
-      "id, reclamo_id, tipo, leida, ocultada, creado_en, reclamo:reclamo_id ( id, titulo, categoria, fecha_creacion, unidad_funcional:unidad_funcional_id ( edificio_id ) )",
+      "id, reclamo_id, tipo, leida, ocultada, creado_en, reclamo:reclamo_id ( id, titulo, numero, categoria, fecha_creacion, unidad_funcional:unidad_funcional_id ( edificio_id, edificio:edificio_id ( codigo ) ) )",
     )
     .eq("usuario_id", userId)
     .eq("ocultada", false)
@@ -252,6 +252,16 @@ export async function markUserNotificationsAsRead(userId) {
     .update({ leida: true })
     .eq("usuario_id", userId)
     .eq("leida", false);
+  if (error) throw error;
+}
+
+// Marca una sola notificación como leída (la campanita ya no las marca sola).
+export async function markUserNotificationRead(notificationId) {
+  if (!notificationId || isDemoMode()) return;
+  const { error } = await supabase
+    .from("usuario_notificaciones")
+    .update({ leida: true })
+    .eq("id", notificationId);
   if (error) throw error;
 }
 
@@ -275,6 +285,21 @@ export async function fetchClaimsForUser() {
     .from(TABLE_NAME)
     .select(SELECT_FIELDS)
     .order("fecha_creacion", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Reclamos sin cerrar que cargó la propia persona, para su pantalla de inicio.
+// (fetchClaimsForUser trae todos los que puede ver, incluidos los de sus vecinos.)
+export async function fetchMisReclamosActivos(userId, limite = 30) {
+  if (!userId || isDemoMode()) return [];
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select(SELECT_FIELDS)
+    .eq("reportante_id", userId)
+    .neq("estado", "cerrado")
+    .order("fecha_actualizacion", { ascending: false })
+    .limit(limite);
   if (error) throw error;
   return data ?? [];
 }

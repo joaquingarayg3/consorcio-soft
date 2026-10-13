@@ -10,6 +10,7 @@ import {
   updateClaim,
 } from "../services/claims";
 import { mensajeDeError } from "../utils/supabase-errors";
+import { etiquetaReclamo } from "../utils/tickets";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
@@ -243,8 +244,8 @@ export default function ReclamoDetalle() {
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-100 pb-5">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-                    R-{String(claim.id).slice(0, 8)} ·{" "}
-                    {claim.categoria || claim.category || "General"}
+                    <span className="font-mono">{etiquetaReclamo(claim)}</span>{" "}
+                    · {claim.categoria || claim.category || "General"}
                   </p>
                   <h1 className="mt-2 text-2xl font-semibold text-stone-900">
                     {claimTitle(claim)}

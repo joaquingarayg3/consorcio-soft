@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   createClaim,
@@ -10,6 +10,7 @@ import {
 import { ModalFormButton } from "./ModalForm";
 import { mensajeDeError } from "../utils/supabase-errors";
 import { coincideBusqueda } from "../utils/texto";
+import { etiquetaReclamo } from "../utils/tickets";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
@@ -141,7 +142,7 @@ function ClaimRow({
             : ""
         }`}
       >
-        {String(claim.id).slice(0, 8)}
+        <span className="font-mono">{etiquetaReclamo(claim)}</span>
       </td>
       <td className="min-w-[12rem] px-4 py-4 align-top">
         <p className="font-semibold text-stone-900">{titleOf(claim)}</p>
@@ -277,7 +278,7 @@ function ClaimsTable({
       <table className="w-full min-w-[760px] text-left">
         <thead className="bg-stone-50 text-[11px] font-semibold uppercase tracking-wide text-stone-400">
           <tr>
-            <th className="px-4 py-3">ID</th>
+            <th className="px-4 py-3">Ticket</th>
             <th className="px-4 py-3">Reclamo</th>
             {mostrarEdificio && (
               <th className="hidden px-4 py-3 sm:table-cell">Edificio</th>
@@ -321,6 +322,15 @@ function ClaimsTable({
 // solo los de ese edificio (así se usa dentro de la pantalla del edificio).
 export default function ClaimsPanel({ edificio = null }) {
   const edificioId = edificio?.id ?? null;
+  const [, navegar] = useLocation();
+  const pedido = new URLSearchParams(useSearch());
+  // El inicio del vecino manda a /reclamos?nuevo=1&unidad=<id> para abrir el
+  // formulario ya con su unidad.
+  const [abrirNuevoAlEntrar] = useState(() => pedido.get("nuevo") === "1");
+  const [unidadPedida] = useState(() => {
+    const id = pedido.get("unidad") ?? "";
+    return /^[0-9a-f-]{36}$/i.test(id) ? id : "";
+  });
   const { session, perfil } = useAuth();
   const isAdmin = perfil?.rol === "admin";
   const userId = session?.user?.id;
@@ -337,14 +347,20 @@ export default function ClaimsPanel({ edificio = null }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(abrirNuevoAlEntrar);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Mantenimiento general");
   const [priority, setPriority] = useState("Media");
-  const [unitId, setUnitId] = useState("");
+  const [unitId, setUnitId] = useState(unidadPedida);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState([]);
+
+  // Una vez abierto el formulario, se limpia la dirección para que recargar la
+  // página no lo vuelva a abrir.
+  useEffect(() => {
+    if (abrirNuevoAlEntrar) navegar("/reclamos", { replace: true });
+  }, [abrirNuevoAlEntrar, navegar]);
 
   const loadClaims = useCallback(async () => {
     try {
@@ -538,6 +554,7 @@ export default function ClaimsPanel({ edificio = null }) {
               edificioDelReclamo?.id === edificioFilter) &&
             coincideBusqueda(
               [
+                etiquetaReclamo(claim),
                 titleOf(claim),
                 categoryValue,
                 claim.unidad_funcional?.identificador,

@@ -5,6 +5,11 @@ import AppHeader from "../components/AppHeader";
 import ModalForm, { ModalFormButton } from "../components/ModalForm";
 import { mensajeDeError } from "../utils/supabase-errors";
 import { coincideBusqueda } from "../utils/texto";
+import {
+  CODIGO_EDIFICIO,
+  normalizarCodigo,
+  sugerirCodigoEdificio,
+} from "../utils/tickets";
 
 const CLAVE_BUSQUEDA = "edificios-busqueda";
 
@@ -118,6 +123,9 @@ function FilaEdificio({ edificio, reclamos, unidades }) {
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-stone-900">
             {edificio.nombre}
+            <span className="ml-2 rounded bg-stone-100 px-1.5 py-0.5 align-middle font-mono text-xs font-medium text-stone-600">
+              {edificio.codigo}
+            </span>
           </p>
           <p className="truncate text-sm text-stone-500">{ubicacion || "—"}</p>
           {/* Hasta tablet los datos van debajo; en escritorio tienen columna */}
@@ -203,6 +211,8 @@ export default function AdminEdificios() {
 
   const [formAbierto, setFormAbierto] = useState(false);
   const [nombre, setNombre] = useState("");
+  // null = se usa la sugerencia según el nombre; si la persona escribe, manda lo suyo.
+  const [codigoManual, setCodigoManual] = useState(null);
   const [direccion, setDireccion] = useState("");
   const [ciudad, setCiudad] = useState("");
   const [provincia, setProvincia] = useState("");
@@ -255,7 +265,7 @@ export default function AdminEdificios() {
         (ed) =>
           (!soloConReclamos || abiertos[ed.id] > 0) &&
           coincideBusqueda(
-            [ed.nombre, ed.direccion, ed.ciudad, ed.provincia],
+            [ed.nombre, ed.codigo, ed.direccion, ed.ciudad, ed.provincia],
             busqueda,
           ),
       ),
@@ -268,13 +278,23 @@ export default function AdminEdificios() {
     setSoloConReclamos(false);
   }
 
+  const codigo =
+    codigoManual ?? (nombre.trim() ? sugerirCodigoEdificio(nombre) : "");
+
   async function handleCrearEdificio(e) {
     e.preventDefault();
-    setCreando(true);
     setFormError(null);
+
+    const codigoFinal = normalizarCodigo(codigo);
+    if (!CODIGO_EDIFICIO.test(codigoFinal)) {
+      setFormError("El código tiene que tener entre 2 y 5 letras o números.");
+      return;
+    }
+    setCreando(true);
 
     const { error } = await supabase.from("edificio").insert({
       nombre,
+      codigo: codigoFinal,
       direccion,
       ciudad: ciudad || null,
       provincia: provincia.trim(),
@@ -284,7 +304,11 @@ export default function AdminEdificios() {
     setCreando(false);
 
     if (error) {
-      setFormError(mensajeDeError(error));
+      setFormError(
+        error.code === "23505"
+          ? "Ese código ya lo usa otro edificio. Elegí uno distinto."
+          : mensajeDeError(error),
+      );
       return;
     }
 
@@ -296,6 +320,7 @@ export default function AdminEdificios() {
       setFormAbierto(false);
       setCreadoOk(false);
       setNombre("");
+      setCodigoManual(null);
       setDireccion("");
       setCiudad("");
       setProvincia("");
@@ -345,6 +370,30 @@ export default function AdminEdificios() {
                 disabled={creando}
                 className={inputClass}
               />
+            </div>
+
+            <div>
+              <label htmlFor="codigo" className={labelClass}>
+                Código
+              </label>
+              <input
+                id="codigo"
+                type="text"
+                required
+                maxLength={5}
+                autoComplete="off"
+                spellCheck={false}
+                value={codigo}
+                onChange={(e) =>
+                  setCodigoManual(normalizarCodigo(e.target.value))
+                }
+                disabled={creando}
+                className={`${inputClass} w-32 font-mono uppercase`}
+              />
+              <p className="mt-1 text-xs text-stone-500">
+                2 a 5 letras o números, único por edificio. Los reclamos se
+                numeran así: {codigo || "XX"}-0001, {codigo || "XX"}-0002...
+              </p>
             </div>
 
             <div>

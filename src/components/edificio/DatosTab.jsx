@@ -1,6 +1,7 @@
 import { useState } from "react";
 import supabase from "../../supabase-client";
 import { mensajeDeError } from "../../utils/supabase-errors";
+import { CODIGO_EDIFICIO, normalizarCodigo } from "../../utils/tickets";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
@@ -8,6 +9,7 @@ const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 export default function DatosTab({ edificio, onSaved }) {
   const [nombre, setNombre] = useState(edificio.nombre);
+  const [codigo, setCodigo] = useState(edificio.codigo || "");
   const [direccion, setDireccion] = useState(edificio.direccion);
   const [ciudad, setCiudad] = useState(edificio.ciudad || "");
   const [provincia, setProvincia] = useState(edificio.provincia || "");
@@ -20,14 +22,22 @@ export default function DatosTab({ edificio, onSaved }) {
 
   async function handleGuardar(e) {
     e.preventDefault();
-    setGuardando(true);
     setGuardadoError(null);
     setGuardadoOk(false);
+
+    if (!CODIGO_EDIFICIO.test(codigo)) {
+      setGuardadoError(
+        "El código tiene que tener entre 2 y 5 letras o números.",
+      );
+      return;
+    }
+    setGuardando(true);
 
     const { data, error } = await supabase
       .from("edificio")
       .update({
         nombre,
+        codigo,
         direccion,
         ciudad: ciudad || null,
         provincia: provincia.trim(),
@@ -40,7 +50,11 @@ export default function DatosTab({ edificio, onSaved }) {
     setGuardando(false);
 
     if (error) {
-      setGuardadoError(mensajeDeError(error));
+      setGuardadoError(
+        error.code === "23505"
+          ? "Ese código ya lo usa otro edificio. Elegí uno distinto."
+          : mensajeDeError(error),
+      );
       return;
     }
     onSaved(data);
@@ -69,6 +83,28 @@ export default function DatosTab({ edificio, onSaved }) {
           disabled={guardando}
           className={inputClass}
         />
+      </div>
+
+      <div>
+        <label htmlFor="codigo" className={labelClass}>
+          Código del edificio
+        </label>
+        <input
+          id="codigo"
+          type="text"
+          required
+          maxLength={5}
+          autoComplete="off"
+          spellCheck={false}
+          value={codigo}
+          onChange={(e) => setCodigo(normalizarCodigo(e.target.value))}
+          disabled={guardando}
+          className={`${inputClass} w-32 font-mono uppercase`}
+        />
+        <p className="mt-1 text-xs text-stone-500">
+          Identifica sus reclamos ({codigo || "XX"}-0001...). Si lo cambiás, los
+          reclamos ya cargados pasan a mostrar el código nuevo.
+        </p>
       </div>
 
       <div>
