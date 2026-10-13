@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import AppHeader from "../components/AppHeader";
+import InicioVecino from "../components/InicioVecino";
 import { Isotipo, PieMarca } from "../components/Marca";
 import imagenEdificios from "../assets/home/edificios.jpg";
 import imagenReclamos from "../assets/home/reclamos.jpg";
@@ -78,34 +79,6 @@ const accesos = [
     icono: iconoReclamos,
   },
 ];
-
-// Para el vecino son "sus" reclamos, sin foto: su vista no cambia.
-const accesoReclamosVecino = {
-  href: "/reclamos",
-  titulo: "Reclamos",
-  descripcion: "Solicitudes y mantenimiento",
-  icono: iconoReclamos,
-};
-
-const accesoAnuncios = {
-  href: "/anuncios",
-  titulo: "Anuncios",
-  descripcion: "Comunicados de la administración",
-  icono: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-    >
-      <path d="m3 11 18-5v12L3 14v-3Z" />
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-    </svg>
-  ),
-};
 
 // Con `imagen`: hasta tablet es la misma fila de siempre (la foto ocupa el
 // lugar del ícono); desde `lg` pasa a tarjeta vertical con la foto arriba.
@@ -191,44 +164,37 @@ export default function Home() {
       <AppHeader />
 
       <main className="flex flex-col items-center px-4 py-8 sm:px-6 sm:py-12 lg:px-10 lg:py-16">
-        <div
-          className={`flex w-full ${ANCHO} items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:p-6`}
-        >
-          <Isotipo className="h-12 w-12 shrink-0 lg:h-14 lg:w-14" />
-          <div className="min-w-0 text-left">
-            <p className="font-semibold text-stone-900">¡Bienvenido/a!</p>
-            <p className="truncate text-sm text-stone-500">
-              Sesión iniciada como{" "}
-              <span className="font-medium text-stone-700">{email}</span>
-            </p>
-          </div>
-        </div>
-
         {perfil?.rol === "admin" && (
-          <div className={`mt-6 w-full ${ANCHO} lg:mt-12`}>
-            <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
-              Panel de administración
-            </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3 lg:gap-6 xl:gap-8">
-              {accesos.map((a) => (
-                <AccesoCard key={a.href} acceso={a} />
-              ))}
+          <>
+            <div
+              className={`flex w-full ${ANCHO} items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:p-6`}
+            >
+              <Isotipo className="h-12 w-12 shrink-0 lg:h-14 lg:w-14" />
+              <div className="min-w-0 text-left">
+                <p className="font-semibold text-stone-900">¡Bienvenido/a!</p>
+                <p className="truncate text-sm text-stone-500">
+                  Sesión iniciada como{" "}
+                  <span className="font-medium text-stone-700">{email}</span>
+                </p>
+              </div>
             </div>
-          </div>
+
+            <div className={`mt-6 w-full ${ANCHO} lg:mt-12`}>
+              <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
+                Panel de administración
+              </h2>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3 lg:gap-6 xl:gap-8">
+                {accesos.map((a) => (
+                  <AccesoCard key={a.href} acceso={a} />
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {/* undefined = el perfil todavía carga: no mostrar la vista equivocada */}
-        {perfil !== undefined && perfil?.rol !== "admin" && (
-          <div className={`mt-6 w-full ${ANCHO} lg:mt-12`}>
-            <h2 className="px-1 text-sm font-semibold tracking-wide text-stone-500 uppercase">
-              Accesos
-            </h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:gap-6 xl:gap-8">
-              <AccesoCard acceso={accesoReclamosVecino} />
-              <AccesoCard acceso={accesoAnuncios} />
-            </div>
-          </div>
-        )}
+        {perfil !== undefined && perfil?.rol !== "admin" && <InicioVecino />}
+
         <PieMarca className="mt-12 lg:mt-20" />
       </main>
     </div>

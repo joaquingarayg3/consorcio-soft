@@ -23,6 +23,24 @@ export function formatearFechaHora(valor) {
   });
 }
 
+// "hace 2 días", "hace 5 minutos", "ahora". `ahora` en milisegundos (ver
+// useAhora): así la función es pura y se actualiza sola.
+export function tiempoRelativo(valor, ahora) {
+  if (!valor) return "";
+  const segundos = Math.round((new Date(valor).getTime() - ahora) / 1000);
+  if (Number.isNaN(segundos)) return "";
+  const formato = new Intl.RelativeTimeFormat("es", { numeric: "auto" });
+  const absoluto = Math.abs(segundos);
+  if (absoluto < 60) return "ahora";
+  if (absoluto < 3600)
+    return formato.format(Math.round(segundos / 60), "minute");
+  if (absoluto < 86400)
+    return formato.format(Math.round(segundos / 3600), "hour");
+  if (absoluto < 86400 * 30)
+    return formato.format(Math.round(segundos / 86400), "day");
+  return formato.format(Math.round(segundos / (86400 * 30)), "month");
+}
+
 // "5 oct 2026" a partir de una fecha "AAAA-MM-DD" (la de fecha_desde/hasta),
 // armada con día y mes locales para que la zona horaria no la corra un día.
 export function formatearFecha(valor) {
