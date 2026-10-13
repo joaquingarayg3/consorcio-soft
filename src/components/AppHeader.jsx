@@ -11,10 +11,14 @@ import {
   fetchUserNotifications,
   getNotificationHistory,
   getUnreadClaims,
+  markUserNotificationRead,
   markUserNotificationsAsRead,
-  markClaimsAsViewed,
 } from "../services/claims";
+import { useAhora } from "../hooks/useAhora";
+import { puedeVolverAtras } from "../utils/navegacion";
 import { useAnunciosUsuario } from "../hooks/useAnunciosUsuario";
+import { esUrgente } from "../utils/anuncios";
+import { etiquetaReclamo } from "../utils/tickets";
 import { asignacionVigente, formatearFechaHora, hoy } from "../utils/fechas";
 
 export default function AppHeader({ backTo }) {
@@ -27,14 +31,13 @@ export default function AppHeader({ backTo }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [allClaims, setAllClaims] = useState([]);
   const [userAssignment, setUserAssignment] = useState(null);
+  const ahora = useAhora();
   const {
     anuncios: anunciosRecientes,
     noLeidos: anunciosNoLeidos,
+    marcarLeido: marcarAnuncioLeido,
     marcarLeidos: marcarAnunciosComoLeidos,
   } = useAnunciosUsuario(session?.user?.id);
-  // Los que eran nuevos al abrir la campanita siguen resaltados mientras
-  // está abierta, aunque ya se hayan marcado como leídos.
-  const [anunciosResaltados, setAnunciosResaltados] = useState(new Set());
   const totalNuevas = notifications.length + anunciosNoLeidos.size;
 
   useEffect(() => {
@@ -135,16 +138,41 @@ export default function AppHeader({ backTo }) {
   }
 
   function handleNotificationsOpen() {
-    const nextOpen = !notificationsOpen;
     setProfileOpen(false);
-    setNotificationsOpen(nextOpen);
-    if (nextOpen) {
-      setNotifications([]);
-      markUserNotificationsAsRead(session?.user?.id).catch(() => null);
-      markClaimsAsViewed(session?.user?.id);
-      setAnunciosResaltados(new Set(anunciosNoLeidos));
-      marcarAnunciosComoLeidos();
-    }
+    setNotificationsOpen((open) => !open);
+  }
+
+  // Nada se marca como leído al abrir la campanita: se hace a propósito, de a
+  // una o todas juntas.
+  function recargarNotificaciones() {
+    window.dispatchEvent(new CustomEvent("claims-viewed"));
+  }
+
+  function marcarNotificacionLeida(claim) {
+    setNotifications((actuales) =>
+      actuales.filter((item) => item.notificationId !== claim.notificationId),
+    );
+    setNotificationHistory((actuales) =>
+      actuales.map((item) =>
+        item.notificationId === claim.notificationId
+          ? { ...item, leida: true }
+          : item,
+      ),
+    );
+    markUserNotificationRead(claim.notificationId).catch(
+      recargarNotificaciones,
+    );
+  }
+
+  function marcarTodoLeido() {
+    setNotifications([]);
+    setNotificationHistory((actuales) =>
+      actuales.map((item) => ({ ...item, leida: true })),
+    );
+    markUserNotificationsAsRead(session?.user?.id).catch(
+      recargarNotificaciones,
+    );
+    marcarAnunciosComoLeidos();
   }
 
   async function handleClearHistory() {
@@ -172,6 +200,16 @@ export default function AppHeader({ backTo }) {
         <Link
           href={backTo}
           aria-label="Volver"
+          onClick={(evento) => {
+            // Con pantalla anterior dentro de la app, la flecha vuelve a ella;
+            // si se entró directo, sigue el enlace a la pantalla "padre".
+            const conModificador =
+              evento.metaKey || evento.ctrlKey || evento.shiftKey;
+            if (!conModificador && puedeVolverAtras()) {
+              evento.preventDefault();
+              window.history.back();
+            }
+          }}
           className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-stone-600 transition-colors hover:bg-stone-100 active:bg-stone-200 sm:w-auto"
         >
           <svg
@@ -241,98 +279,179 @@ export default function AppHeader({ backTo }) {
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+            <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
                 <p className="font-semibold text-stone-900">Notificaciones</p>
-                <Link
-                  href="/reclamos"
-                  onClick={() => setNotificationsOpen(false)}
-                  className="text-xs font-medium text-brand-700 hover:text-brand-800"
-                >
-                  Ver reclamos
-                </Link>
-              </div>
-              {anunciosRecientes.length > 0 && (
-                <div className="border-b border-stone-100">
-                  <div className="flex items-center justify-between px-4 pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
-                      Anuncios
-                    </p>
-                    <Link
-                      href="/anuncios"
-                      onClick={() => setNotificationsOpen(false)}
-                      className="text-xs font-medium text-brand-700 hover:text-brand-800"
-                    >
-                      Ver todos
-                    </Link>
-                  </div>
-                  {anunciosRecientes.slice(0, 3).map((anuncio) => (
-                    <Link
-                      key={anuncio.id}
-                      href="/anuncios"
-                      onClick={() => setNotificationsOpen(false)}
-                      className="block px-4 py-3 transition-colors hover:bg-stone-50"
-                    >
-                      <p className="flex items-center gap-2 text-sm font-medium text-stone-800">
-                        {anunciosResaltados.has(anuncio.id) && (
-                          <>
-                            <span
-                              aria-hidden="true"
-                              className="h-2 w-2 shrink-0 rounded-full bg-brand-600"
-                            />
-                            <span className="sr-only">Nuevo: </span>
-                          </>
-                        )}
-                        <span className="truncate">{anuncio.titulo}</span>
-                      </p>
-                      <p className="mt-1 truncate text-xs text-stone-400">
-                        {anuncio.edificio?.nombre
-                          ? `${anuncio.edificio.nombre} · `
-                          : ""}
-                        {formatearFechaHora(anuncio.creado_en)}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              )}
-              {notificationHistory.length === 0 ? (
-                anunciosRecientes.length === 0 && (
-                  <p className="px-4 py-6 text-center text-sm text-stone-500">
-                    No hay notificaciones en el historial.
-                  </p>
-                )
-              ) : (
-                <>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notificationHistory.slice(0, 8).map((claim) => (
-                      <Link
-                        key={claim.id}
-                        href={`/reclamos/${claim.id}`}
-                        onClick={() => setNotificationsOpen(false)}
-                        className="block border-b border-stone-100 px-4 py-3 transition-colors hover:bg-stone-50"
-                      >
-                        <p className="text-sm font-medium text-stone-800">
-                          Nuevo reclamo: {notificationTitle(claim)}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-400">
-                          {claim.fecha_creacion
-                            ? new Date(claim.fecha_creacion).toLocaleString(
-                                "es-AR",
-                              )
-                            : ""}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
+                {totalNuevas > 0 ? (
                   <button
                     type="button"
-                    onClick={handleClearHistory}
-                    className="w-full border-t border-stone-100 px-4 py-3 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    onClick={marcarTodoLeido}
+                    className="text-xs font-medium text-brand-700 hover:text-brand-800 hover:underline"
                   >
-                    Limpiar historial
+                    Marcar todo como leído
                   </button>
-                </>
-              )}
+                ) : (
+                  <Link
+                    href="/reclamos"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                  >
+                    Ver reclamos
+                  </Link>
+                )}
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto">
+                {anunciosRecientes.length > 0 && (
+                  <div className="border-b border-stone-100">
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Anuncios
+                      </p>
+                      <Link
+                        href="/anuncios"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                      >
+                        Ver todos
+                      </Link>
+                    </div>
+                    {[...anunciosRecientes]
+                      .sort(
+                        (a, b) =>
+                          Number(esUrgente(b, ahora)) -
+                          Number(esUrgente(a, ahora)),
+                      )
+                      .slice(0, 4)
+                      .map((anuncio) => {
+                        const leido = !anunciosNoLeidos.has(anuncio.id);
+                        const urgente = esUrgente(anuncio, ahora);
+                        return (
+                          <div
+                            key={anuncio.id}
+                            className={`flex items-start gap-2 border-l-4 px-3 py-2.5 ${
+                              leido
+                                ? "border-transparent bg-stone-50 text-stone-500"
+                                : urgente
+                                  ? "border-brand-600 bg-brand-50"
+                                  : "border-amber-400 bg-amber-50/60"
+                            }`}
+                          >
+                            <Link
+                              href="/anuncios"
+                              onClick={() => setNotificationsOpen(false)}
+                              className="min-w-0 flex-1 rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                            >
+                              <p
+                                className={`flex items-center gap-2 text-sm ${
+                                  leido
+                                    ? "font-normal text-stone-600"
+                                    : "font-semibold text-stone-900"
+                                }`}
+                              >
+                                {urgente && (
+                                  <span className="shrink-0 rounded-full bg-brand-700 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
+                                    Urgente
+                                  </span>
+                                )}
+                                <span className="truncate">
+                                  {anuncio.titulo}
+                                </span>
+                              </p>
+                              <p className="mt-0.5 truncate text-xs text-stone-500">
+                                {anuncio.edificio?.nombre
+                                  ? `${anuncio.edificio.nombre} · `
+                                  : ""}
+                                {formatearFechaHora(anuncio.creado_en)}
+                              </p>
+                            </Link>
+                            {!leido && (
+                              <button
+                                type="button"
+                                onClick={() => marcarAnuncioLeido(anuncio.id)}
+                                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                              >
+                                Marcar como leído
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {notificationHistory.length === 0 ? (
+                  anunciosRecientes.length === 0 && (
+                    <p className="px-4 py-6 text-center text-sm text-stone-500">
+                      No hay notificaciones en el historial.
+                    </p>
+                  )
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Reclamos
+                      </p>
+                      <Link
+                        href="/reclamos"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                      >
+                        Ver reclamos
+                      </Link>
+                    </div>
+                    {notificationHistory.slice(0, 8).map((claim) => (
+                      <div
+                        key={claim.notificationId ?? claim.id}
+                        className={`flex items-start gap-2 border-l-4 border-b border-b-stone-100 px-3 py-2.5 ${
+                          claim.leida
+                            ? "border-l-transparent bg-stone-50 text-stone-500"
+                            : "border-l-amber-400 bg-amber-50/60"
+                        }`}
+                      >
+                        <Link
+                          href={`/reclamos/${claim.id}`}
+                          onClick={() => setNotificationsOpen(false)}
+                          className="min-w-0 flex-1 rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                        >
+                          <p
+                            className={`text-sm ${
+                              claim.leida
+                                ? "font-normal text-stone-600"
+                                : "font-semibold text-stone-900"
+                            }`}
+                          >
+                            Nuevo reclamo {etiquetaReclamo(claim)}:{" "}
+                            {notificationTitle(claim)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-stone-500">
+                            {claim.fecha_creacion
+                              ? new Date(claim.fecha_creacion).toLocaleString(
+                                  "es-AR",
+                                )
+                              : ""}
+                          </p>
+                        </Link>
+                        {!claim.leida && claim.notificationId && (
+                          <button
+                            type="button"
+                            onClick={() => marcarNotificacionLeida(claim)}
+                            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                          >
+                            Marcar como leído
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleClearHistory}
+                      className="w-full px-4 py-3 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Limpiar historial
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

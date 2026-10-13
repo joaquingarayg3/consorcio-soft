@@ -106,6 +106,7 @@ export default function AdminEdificioDetalle() {
                   <Link
                     key={t.key}
                     href={`/admin/edificios/${id}/${t.key}`}
+                    replace
                     aria-current={activa ? "page" : undefined}
                     className={`flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold sm:px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
                       activa
