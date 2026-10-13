@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { Isotipo } from "./Marca";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -18,23 +19,7 @@ export default class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-stone-50 px-4 text-center">
-          <div
-            aria-hidden="true"
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6"
-            >
-              <path d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
-            </svg>
-          </div>
+          <Isotipo className="h-16 w-16" />
           <p className="text-lg font-semibold text-stone-900">
             Ocurrió un error inesperado
           </p>
@@ -45,7 +30,7 @@ export default class ErrorBoundary extends Component {
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900"
+            className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900"
           >
             Recargar página
           </button>

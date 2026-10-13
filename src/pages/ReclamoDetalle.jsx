@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, useSearch } from "wouter";
 import AppHeader from "../components/AppHeader";
+import SegmentedControl from "../components/SegmentedControl";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   addClaimComment,
@@ -9,15 +10,63 @@ import {
   updateClaim,
 } from "../services/claims";
 import { mensajeDeError } from "../utils/supabase-errors";
+import { etiquetaReclamo } from "../utils/tickets";
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
 const statusLabels = {
   abierto: "Activo",
   en_curso: "En curso",
   cerrado: "Cerrado",
 };
-const priorities = ["Baja", "Media", "Alta", "Urgente"];
+
+const ESTADOS = [
+  {
+    value: "abierto",
+    label: "Activo",
+    activa: "bg-amber-100 text-amber-900 ring-1 ring-amber-300",
+    punto: "bg-amber-500",
+  },
+  {
+    value: "en_curso",
+    label: "En curso",
+    activa: "bg-blue-100 text-blue-800 ring-1 ring-blue-300",
+    punto: "bg-blue-500",
+  },
+  {
+    value: "cerrado",
+    label: "Cerrado",
+    activa: "bg-green-100 text-green-800 ring-1 ring-green-300",
+    punto: "bg-green-500",
+  },
+];
+
+const PRIORIDADES = [
+  {
+    value: "Baja",
+    label: "Baja",
+    activa: "bg-white text-stone-800 ring-1 ring-stone-300",
+    punto: "bg-stone-400",
+  },
+  {
+    value: "Media",
+    label: "Media",
+    activa: "bg-amber-100 text-amber-900 ring-1 ring-amber-300",
+    punto: "bg-amber-500",
+  },
+  {
+    value: "Alta",
+    label: "Alta",
+    activa: "bg-orange-100 text-orange-800 ring-1 ring-orange-300",
+    punto: "bg-orange-500",
+  },
+  {
+    value: "Urgente",
+    label: "Urgente",
+    activa: "bg-red-100 text-red-800 ring-1 ring-red-300",
+    punto: "bg-red-500",
+  },
+];
 
 function claimStatus(claim) {
   return claim?.estado || claim?.status || "abierto";
@@ -27,9 +76,17 @@ function claimTitle(claim) {
   return claim?.titulo || claim?.title || "Reclamo";
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function ReclamoDetalle() {
   const { id } = useParams();
   const [, navigate] = useLocation();
+  // Si se llegó desde la pantalla de un edificio, "Volver" regresa ahí. Solo
+  // se acepta un UUID: nada que venga de la URL se usa como ruta tal cual.
+  const edificioOrigen = new URLSearchParams(useSearch()).get("edificio");
+  const volverA = UUID.test(edificioOrigen ?? "")
+    ? `/admin/edificios/${edificioOrigen}/reclamos`
+    : "/reclamos";
   const { session, perfil } = useAuth();
   const isAdmin = perfil?.rol === "admin";
   const userId = session?.user?.id;
@@ -132,6 +189,7 @@ export default function ReclamoDetalle() {
   const status = claimStatus(claim);
   const priority = claim?.prioridad || claim?.priority || "Media";
   const imageUrls = claim?.imagen_urls || claim?.image_urls || [];
+  const hayCambios = draftStatus !== status || draftPriority !== priority;
   const authorName = (commentItem) => {
     const author = commentItem.autor || commentItem.author;
     return author
@@ -141,12 +199,12 @@ export default function ReclamoDetalle() {
 
   return (
     <div className="min-h-dvh bg-stone-50">
-      <AppHeader backTo="/reclamos" />
+      <AppHeader backTo={volverA} />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <button
           type="button"
-          onClick={() => navigate("/reclamos")}
-          className="mb-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+          onClick={() => navigate(volverA)}
+          className="mb-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
         >
           <svg
             aria-hidden="true"
@@ -162,7 +220,7 @@ export default function ReclamoDetalle() {
               d="m15 18-6-6 6-6"
             />
           </svg>
-          Volver a reclamos
+          {volverA === "/reclamos" ? "Volver a reclamos" : "Volver al edificio"}
         </button>
         {loading && (
           <p className="text-sm text-stone-500">Cargando reclamo...</p>
@@ -186,8 +244,8 @@ export default function ReclamoDetalle() {
               <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone-100 pb-5">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-                    R-{String(claim.id).slice(0, 8)} ·{" "}
-                    {claim.categoria || claim.category || "General"}
+                    <span className="font-mono">{etiquetaReclamo(claim)}</span>{" "}
+                    · {claim.categoria || claim.category || "General"}
                   </p>
                   <h1 className="mt-2 text-2xl font-semibold text-stone-900">
                     {claimTitle(claim)}
@@ -220,7 +278,7 @@ export default function ReclamoDetalle() {
                           href={imageUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="group aspect-[16/10] overflow-hidden rounded-lg border border-stone-200 bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+                          className="group aspect-[16/10] overflow-hidden rounded-lg border border-stone-200 bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
                         >
                           <img
                             src={imageUrl}
@@ -279,45 +337,49 @@ export default function ReclamoDetalle() {
                   <p className="mb-3 text-[10px] font-medium uppercase tracking-wide text-stone-400">
                     Gestión del reclamo
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <select
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <SegmentedControl
+                      legend="Estado"
                       value={draftStatus}
+                      onChange={setDraftStatus}
+                      options={ESTADOS}
                       disabled={saving}
-                      onChange={(event) => setDraftStatus(event.target.value)}
-                      className={inputClass + " sm:w-auto"}
-                    >
-                      <option value="abierto">Activo</option>
-                      <option value="en_curso">En curso</option>
-                      <option value="cerrado">Cerrado</option>
-                    </select>
-                    <select
+                    />
+                    <SegmentedControl
+                      legend="Prioridad"
                       value={draftPriority}
+                      onChange={setDraftPriority}
+                      options={PRIORIDADES}
                       disabled={saving}
-                      onChange={(event) => setDraftPriority(event.target.value)}
-                      className={inputClass + " sm:w-auto"}
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
+                    <button
+                      type="button"
+                      disabled={saving || !hayCambios}
+                      onClick={handleSaveChanges}
+                      className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
                     >
-                      {priorities.map((option) => (
-                        <option key={option}>{option}</option>
-                      ))}
-                    </select>
-                    <div className="flex w-full flex-wrap gap-2 pt-1">
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={handleSaveChanges}
-                        className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {saving ? "Guardando..." : "Guardar cambios"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={saving}
-                        onClick={handleDiscardChanges}
-                        className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Descartar cambios
-                      </button>
-                    </div>
+                      {saving ? "Guardando..." : "Guardar cambios"}
+                    </button>
+                    {hayCambios && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={handleDiscardChanges}
+                          className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Descartar cambios
+                        </button>
+                        <p
+                          role="status"
+                          className="text-sm text-amber-800 sm:ml-1"
+                        >
+                          Tenés cambios sin guardar.
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -384,7 +446,7 @@ export default function ReclamoDetalle() {
                 <button
                   type="submit"
                   disabled={saving || !comment.trim()}
-                  className="mt-3 rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? "Guardando..." : "Comentar"}
                 </button>

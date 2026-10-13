@@ -1,6 +1,24 @@
+<p align="center">
+  <img src="src/assets/brand/logotipo.png" alt="SMPH - Supervisión y Mantenimiento Propiedad Horizontal" width="200" />
+</p>
+
 # Consorcio Soft
 
 Aplicacion para gestionar edificios, unidades, usuarios y reclamos de mantenimiento con React, Vite y Supabase.
+
+## Marca y colores
+
+El nombre es **Supervisión y Mantenimiento Propiedad Horizontal (SMPH)**. El logotipo y el isotipo están en `src/assets/brand/`; los íconos de la pestaña del navegador y del celular, en `public/`. El nombre y las siglas se definen en `src/utils/marca.js`, y los componentes de marca (`Isotipo`, `Logotipo`, `FranjaMarca`, `PieMarca`) en `src/components/Marca.jsx`.
+
+Los colores salen del logo y se definen una sola vez, en `src/index.css`:
+
+| Color | Valor | Se usa en |
+| --- | --- | --- |
+| Rojo (`brand-700`) | `#A8031A` | Botones y enlaces principales |
+| Naranja (`amber-500`) | `#ED8214` | Acentos, fichas y avisos suaves |
+| Gris carbón (`stone-800`) | `#2C323A` | Textos, bordes y fondos neutros |
+
+En la app, `amber` y `stone` son estas escalas de marca (no las de Tailwind). Rojo, verde y azul "normales" (`red`, `green`, `blue`) quedan para alertas, éxito y estados.
 
 ## Requisitos
 
@@ -55,6 +73,12 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20260924120300_asignaciones_vigentes.sql` | `fecha_hasta` de una asignación pasa a ser exclusiva (finalizar hoy corta el acceso en el acto) y permite reasignar a alguien a una unidad que ya tuvo. |
 | `20260924120400_rendimiento_rls.sql` | Índices en claves foráneas y `auth.uid()` evaluado una vez por consulta. |
 | `20260924120500_reclamos_select_fila.sql` | La lectura de reclamos se evalúa con la propia fila: permite que un usuario común cree reclamos. |
+| `20261005120000_anuncios.sql` | Crea `anuncios` (por edificio) y `anuncio_lecturas` (qué leyó cada persona), con sus políticas RLS y permisos. |
+| `20261007120000_buscar_usuarios.sql` | Crea la función `buscar_perfiles_activos`, que busca usuarios activos ignorando tildes y mayúsculas (la usa el modal para asignar usuarios a una unidad). |
+| `20261007130000_buscar_perfiles_admin.sql` | Crea la función `buscar_perfiles`: listado de usuarios con búsqueda sin tildes, filtros por estado y rol, orden y paginado (la usa la pantalla de Usuarios). |
+| `20261008120000_eliminar_usuarios.sql` | Crea `eliminar_usuario_definitivo` (solo la llama la Edge Function): borra asignaciones, notificaciones y perfil de un usuario inactivo y desvincula —sin borrar— sus reclamos, comentarios, historial y anuncios. También hace que los triggers de reclamos acepten cambios de la clave de servicio. **Requiere volver a desplegar la función `admin-users`.** |
+| `20261013120000_inicio_vecino.sql` | Anuncios urgentes (`anuncios.urgente_hasta`), código de cada edificio (`edificio.codigo`, único, ej. `HP`) y número de reclamo por edificio (`reclamos.numero`, asignado por la base; el ticket se muestra `HP-0012`). Numera los reclamos ya existentes por orden de creación y les sugiere un código a los edificios actuales. **Hay que aplicarla antes de usar la versión nueva de la app.** |
+| `20261014120000_foto_edificio.sql` | Foto de cada edificio: columnas `foto_path`, `miniatura_path` y `foto_actualizada_en` en `edificio`, y el bucket privado `edificios` (la ven administradores y vecinos de ese edificio; solo administradores suben o borran). |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
 
@@ -71,6 +95,7 @@ Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, 
 - Un usuario ve los reclamos de los edificios donde tiene una unidad vigente, y solo su propio perfil.
 - Un usuario solo puede crear reclamos a su nombre, en su unidad, abiertos y sin prioridad `Urgente`.
 - Cambiar estado o prioridad, borrar reclamos, y administrar edificios, unidades y usuarios es solo para admins.
+- Los anuncios los publica, edita y borra solo un admin, siempre desde la pantalla de un edificio. Los ven los admins y quienes tienen una unidad vigente en ese edificio; cada persona solo registra lecturas propias.
 - Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
 
 `supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.

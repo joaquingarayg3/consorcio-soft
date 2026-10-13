@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { FranjaMarca, Isotipo } from "./Marca";
+import { NOMBRE_MARCA, SIGLAS } from "../utils/marca";
 import supabase from "../supabase-client";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
@@ -9,10 +11,15 @@ import {
   fetchUserNotifications,
   getNotificationHistory,
   getUnreadClaims,
+  markUserNotificationRead,
   markUserNotificationsAsRead,
-  markClaimsAsViewed,
 } from "../services/claims";
-import { asignacionVigente, hoy } from "../utils/fechas";
+import { useAhora } from "../hooks/useAhora";
+import { puedeVolverAtras } from "../utils/navegacion";
+import { useAnunciosUsuario } from "../hooks/useAnunciosUsuario";
+import { esUrgente } from "../utils/anuncios";
+import { etiquetaReclamo } from "../utils/tickets";
+import { asignacionVigente, formatearFechaHora, hoy } from "../utils/fechas";
 
 export default function AppHeader({ backTo }) {
   const { session, perfil, singOutUser } = useAuth();
@@ -24,6 +31,14 @@ export default function AppHeader({ backTo }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [allClaims, setAllClaims] = useState([]);
   const [userAssignment, setUserAssignment] = useState(null);
+  const ahora = useAhora();
+  const {
+    anuncios: anunciosRecientes,
+    noLeidos: anunciosNoLeidos,
+    marcarLeido: marcarAnuncioLeido,
+    marcarLeidos: marcarAnunciosComoLeidos,
+  } = useAnunciosUsuario(session?.user?.id);
+  const totalNuevas = notifications.length + anunciosNoLeidos.size;
 
   useEffect(() => {
     let active = true;
@@ -123,14 +138,41 @@ export default function AppHeader({ backTo }) {
   }
 
   function handleNotificationsOpen() {
-    const nextOpen = !notificationsOpen;
     setProfileOpen(false);
-    setNotificationsOpen(nextOpen);
-    if (nextOpen) {
-      setNotifications([]);
-      markUserNotificationsAsRead(session?.user?.id).catch(() => null);
-      markClaimsAsViewed(session?.user?.id);
-    }
+    setNotificationsOpen((open) => !open);
+  }
+
+  // Nada se marca como leído al abrir la campanita: se hace a propósito, de a
+  // una o todas juntas.
+  function recargarNotificaciones() {
+    window.dispatchEvent(new CustomEvent("claims-viewed"));
+  }
+
+  function marcarNotificacionLeida(claim) {
+    setNotifications((actuales) =>
+      actuales.filter((item) => item.notificationId !== claim.notificationId),
+    );
+    setNotificationHistory((actuales) =>
+      actuales.map((item) =>
+        item.notificationId === claim.notificationId
+          ? { ...item, leida: true }
+          : item,
+      ),
+    );
+    markUserNotificationRead(claim.notificationId).catch(
+      recargarNotificaciones,
+    );
+  }
+
+  function marcarTodoLeido() {
+    setNotifications([]);
+    setNotificationHistory((actuales) =>
+      actuales.map((item) => ({ ...item, leida: true })),
+    );
+    markUserNotificationsAsRead(session?.user?.id).catch(
+      recargarNotificaciones,
+    );
+    marcarAnunciosComoLeidos();
   }
 
   async function handleClearHistory() {
@@ -149,14 +191,25 @@ export default function AppHeader({ backTo }) {
 
   return (
     <header
-      className={`grid items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
+      className={`relative grid items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
         backTo ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"
       }`}
     >
+      <FranjaMarca className="absolute inset-x-0 top-0" />
       {backTo && (
         <Link
           href={backTo}
           aria-label="Volver"
+          onClick={(evento) => {
+            // Con pantalla anterior dentro de la app, la flecha vuelve a ella;
+            // si se entró directo, sigue el enlace a la pantalla "padre".
+            const conModificador =
+              evento.metaKey || evento.ctrlKey || evento.shiftKey;
+            if (!conModificador && puedeVolverAtras()) {
+              evento.preventDefault();
+              window.history.back();
+            }
+          }}
           className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-stone-600 transition-colors hover:bg-stone-100 active:bg-stone-200 sm:w-auto"
         >
           <svg
@@ -175,22 +228,35 @@ export default function AppHeader({ backTo }) {
         </Link>
       )}
 
-      <span
-        className={`min-w-0 truncate text-sm font-bold text-stone-900 sm:text-lg ${
-          backTo ? "text-center" : "text-left"
+      <Link
+        href="/home"
+        aria-label={`${NOMBRE_MARCA}: ir al inicio`}
+        className={`flex min-w-0 items-center gap-2.5 rounded-lg py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
+          backTo ? "justify-center" : "justify-start"
         }`}
       >
-        Supervisión y Mantenimiento
-      </span>
+        <Isotipo className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+        <span aria-hidden="true" className="min-w-0 leading-tight">
+          <span className="block text-base font-extrabold tracking-wider text-stone-800 sm:hidden">
+            {SIGLAS}
+          </span>
+          <span className="hidden truncate text-base font-bold text-stone-900 sm:block lg:text-lg">
+            Supervisión y Mantenimiento
+          </span>
+          <span className="hidden truncate text-[11px] font-medium tracking-[0.18em] text-stone-500 uppercase sm:block">
+            Propiedad Horizontal
+          </span>
+        </span>
+      </Link>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="relative">
           <button
             type="button"
-            aria-label={`Notificaciones${notifications.length ? `: ${notifications.length} nuevas` : ""}`}
+            aria-label={`Notificaciones${totalNuevas ? `: ${totalNuevas} nuevas` : ""}`}
             aria-expanded={notificationsOpen}
             onClick={handleNotificationsOpen}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
           >
             <svg
               aria-hidden="true"
@@ -206,60 +272,186 @@ export default function AppHeader({ backTo }) {
                 d="M15 17H9m10-2V11a7 7 0 1 0-14 0v4l-2 2h18l-2-2Zm-5 5h-2"
               />
             </svg>
-            {notifications.length > 0 && (
+            {totalNuevas > 0 && (
               <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
-                {notifications.length > 9 ? "9+" : notifications.length}
+                {totalNuevas > 9 ? "9+" : totalNuevas}
               </span>
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+            <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
                 <p className="font-semibold text-stone-900">Notificaciones</p>
-                <Link
-                  href="/reclamos"
-                  onClick={() => setNotificationsOpen(false)}
-                  className="text-xs font-medium text-amber-700 hover:text-amber-800"
-                >
-                  Ver reclamos
-                </Link>
-              </div>
-              {notificationHistory.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-stone-500">
-                  No hay notificaciones en el historial.
-                </p>
-              ) : (
-                <>
-                  <div className="max-h-80 overflow-y-auto">
-                    {notificationHistory.slice(0, 8).map((claim) => (
-                      <Link
-                        key={claim.id}
-                        href={`/reclamos/${claim.id}`}
-                        onClick={() => setNotificationsOpen(false)}
-                        className="block border-b border-stone-100 px-4 py-3 transition-colors hover:bg-stone-50"
-                      >
-                        <p className="text-sm font-medium text-stone-800">
-                          Nuevo reclamo: {notificationTitle(claim)}
-                        </p>
-                        <p className="mt-1 text-xs text-stone-400">
-                          {claim.fecha_creacion
-                            ? new Date(claim.fecha_creacion).toLocaleString(
-                                "es-AR",
-                              )
-                            : ""}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
+                {totalNuevas > 0 ? (
                   <button
                     type="button"
-                    onClick={handleClearHistory}
-                    className="w-full border-t border-stone-100 px-4 py-3 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    onClick={marcarTodoLeido}
+                    className="text-xs font-medium text-brand-700 hover:text-brand-800 hover:underline"
                   >
-                    Limpiar historial
+                    Marcar todo como leído
                   </button>
-                </>
-              )}
+                ) : (
+                  <Link
+                    href="/reclamos"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                  >
+                    Ver reclamos
+                  </Link>
+                )}
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto">
+                {anunciosRecientes.length > 0 && (
+                  <div className="border-b border-stone-100">
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Anuncios
+                      </p>
+                      <Link
+                        href="/anuncios"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                      >
+                        Ver todos
+                      </Link>
+                    </div>
+                    {[...anunciosRecientes]
+                      .sort(
+                        (a, b) =>
+                          Number(esUrgente(b, ahora)) -
+                          Number(esUrgente(a, ahora)),
+                      )
+                      .slice(0, 4)
+                      .map((anuncio) => {
+                        const leido = !anunciosNoLeidos.has(anuncio.id);
+                        const urgente = esUrgente(anuncio, ahora);
+                        return (
+                          <div
+                            key={anuncio.id}
+                            className={`flex items-start gap-2 border-l-4 px-3 py-2.5 ${
+                              leido
+                                ? "border-transparent bg-stone-50 text-stone-500"
+                                : urgente
+                                  ? "border-brand-600 bg-brand-50"
+                                  : "border-amber-400 bg-amber-50/60"
+                            }`}
+                          >
+                            <Link
+                              href="/anuncios"
+                              onClick={() => setNotificationsOpen(false)}
+                              className="min-w-0 flex-1 rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                            >
+                              <p
+                                className={`flex items-center gap-2 text-sm ${
+                                  leido
+                                    ? "font-normal text-stone-600"
+                                    : "font-semibold text-stone-900"
+                                }`}
+                              >
+                                {urgente && (
+                                  <span className="shrink-0 rounded-full bg-brand-700 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-white uppercase">
+                                    Urgente
+                                  </span>
+                                )}
+                                <span className="truncate">
+                                  {anuncio.titulo}
+                                </span>
+                              </p>
+                              <p className="mt-0.5 truncate text-xs text-stone-500">
+                                {anuncio.edificio?.nombre
+                                  ? `${anuncio.edificio.nombre} · `
+                                  : ""}
+                                {formatearFechaHora(anuncio.creado_en)}
+                              </p>
+                            </Link>
+                            {!leido && (
+                              <button
+                                type="button"
+                                onClick={() => marcarAnuncioLeido(anuncio.id)}
+                                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                              >
+                                Marcar como leído
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {notificationHistory.length === 0 ? (
+                  anunciosRecientes.length === 0 && (
+                    <p className="px-4 py-6 text-center text-sm text-stone-500">
+                      No hay notificaciones en el historial.
+                    </p>
+                  )
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        Reclamos
+                      </p>
+                      <Link
+                        href="/reclamos"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                      >
+                        Ver reclamos
+                      </Link>
+                    </div>
+                    {notificationHistory.slice(0, 8).map((claim) => (
+                      <div
+                        key={claim.notificationId ?? claim.id}
+                        className={`flex items-start gap-2 border-l-4 border-b border-b-stone-100 px-3 py-2.5 ${
+                          claim.leida
+                            ? "border-l-transparent bg-stone-50 text-stone-500"
+                            : "border-l-amber-400 bg-amber-50/60"
+                        }`}
+                      >
+                        <Link
+                          href={`/reclamos/${claim.id}`}
+                          onClick={() => setNotificationsOpen(false)}
+                          className="min-w-0 flex-1 rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                        >
+                          <p
+                            className={`text-sm ${
+                              claim.leida
+                                ? "font-normal text-stone-600"
+                                : "font-semibold text-stone-900"
+                            }`}
+                          >
+                            Nuevo reclamo {etiquetaReclamo(claim)}:{" "}
+                            {notificationTitle(claim)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-stone-500">
+                            {claim.fecha_creacion
+                              ? new Date(claim.fecha_creacion).toLocaleString(
+                                  "es-AR",
+                                )
+                              : ""}
+                          </p>
+                        </Link>
+                        {!claim.leida && claim.notificationId && (
+                          <button
+                            type="button"
+                            onClick={() => marcarNotificacionLeida(claim)}
+                            className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+                          >
+                            Marcar como leído
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={handleClearHistory}
+                      className="w-full px-4 py-3 text-left text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Limpiar historial
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -272,14 +464,14 @@ export default function AppHeader({ backTo }) {
               setNotificationsOpen(false);
               setProfileOpen((open) => !open);
             }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
           >
             {initial}
           </button>
           {profileOpen && (
             <div className="absolute right-0 top-12 z-50 w-72 rounded-xl border border-stone-200 bg-white p-4 shadow-xl">
               <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white">
                   {initial}
                 </div>
                 <div className="min-w-0">
