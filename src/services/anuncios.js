@@ -1,9 +1,9 @@
 import supabase from "../supabase-client";
 import { asignacionVigente, hoy } from "../utils/fechas";
 
-const CAMPOS_RESUMEN = "id, titulo, creado_en, edificio_id";
+const CAMPOS_RESUMEN = "id, titulo, creado_en, edificio_id, urgente_hasta";
 const CAMPOS_COMPLETOS = `${CAMPOS_RESUMEN}, contenido`;
-const EDIFICIO = "edificio:edificio_id ( nombre )";
+const EDIFICIO = "edificio:edificio_id ( nombre, codigo )";
 
 // Edificios donde la persona tiene hoy una unidad vigente. Es lo que decide
 // qué anuncios son "suyos": un admin ve todos por permisos, pero sus avisos
@@ -82,7 +82,13 @@ export async function fetchAnunciosDeEdificio(edificioId) {
   return data ?? [];
 }
 
-export async function crearAnuncio({ edificioId, titulo, contenido, userId }) {
+export async function crearAnuncio({
+  edificioId,
+  titulo,
+  contenido,
+  userId,
+  urgenteHasta = null,
+}) {
   const { data, error } = await supabase
     .from("anuncios")
     .insert({
@@ -90,6 +96,7 @@ export async function crearAnuncio({ edificioId, titulo, contenido, userId }) {
       titulo: titulo.trim(),
       contenido: contenido.trim(),
       creado_por: userId,
+      urgente_hasta: urgenteHasta,
     })
     .select(CAMPOS_COMPLETOS)
     .single();
@@ -97,10 +104,17 @@ export async function crearAnuncio({ edificioId, titulo, contenido, userId }) {
   return data;
 }
 
-export async function actualizarAnuncio(id, { titulo, contenido }) {
+export async function actualizarAnuncio(
+  id,
+  { titulo, contenido, urgenteHasta = null },
+) {
   const { data, error } = await supabase
     .from("anuncios")
-    .update({ titulo: titulo.trim(), contenido: contenido.trim() })
+    .update({
+      titulo: titulo.trim(),
+      contenido: contenido.trim(),
+      urgente_hasta: urgenteHasta,
+    })
     .eq("id", id)
     .select(CAMPOS_COMPLETOS)
     .single();

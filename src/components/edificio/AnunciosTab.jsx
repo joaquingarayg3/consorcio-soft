@@ -6,10 +6,18 @@ import {
   eliminarAnuncio,
   fetchAnunciosDeEdificio,
 } from "../../services/anuncios";
+import { useAhora } from "../../hooks/useAhora";
+import {
+  URGENCIA_VACIA,
+  esUrgente,
+  urgenciaDesdeAnuncio,
+  urgenteHastaDesdeCampo,
+} from "../../utils/anuncios";
 import { formatearFechaHora } from "../../utils/fechas";
 import { mensajeDeError } from "../../utils/supabase-errors";
 import ConfirmDialog from "../ConfirmDialog";
 import ModalForm, { ModalFormButton } from "../ModalForm";
+import CampoUrgente from "./CampoUrgente";
 
 const MAX_TITULO = 120;
 const MAX_CONTENIDO = 4000;
@@ -29,6 +37,7 @@ function Contador({ valor, maximo }) {
 export default function AnunciosTab({ edificio }) {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const ahora = useAhora();
 
   const [anuncios, setAnuncios] = useState(null);
   const [listaError, setListaError] = useState(null);
@@ -36,6 +45,7 @@ export default function AnunciosTab({ edificio }) {
   const [formAbierto, setFormAbierto] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [contenido, setContenido] = useState("");
+  const [urgencia, setUrgencia] = useState(URGENCIA_VACIA);
   const [publicando, setPublicando] = useState(false);
   const [publicadoOk, setPublicadoOk] = useState(false);
   const [formError, setFormError] = useState(null);
@@ -44,8 +54,15 @@ export default function AnunciosTab({ edificio }) {
   const [editandoId, setEditandoId] = useState(null);
   const [editTitulo, setEditTitulo] = useState("");
   const [editContenido, setEditContenido] = useState("");
+  const [editUrgencia, setEditUrgencia] = useState(URGENCIA_VACIA);
   const [guardando, setGuardando] = useState(false);
   const [editError, setEditError] = useState(null);
+
+  // Avisos urgentes que hoy siguen vigentes en este edificio: sirve para avisar
+  // antes de sumar otro.
+  const urgentesVigentes = (anuncios ?? []).filter((anuncio) =>
+    esUrgente(anuncio, ahora),
+  );
 
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
@@ -74,14 +91,21 @@ export default function AnunciosTab({ edificio }) {
 
   async function handlePublicar(e) {
     e.preventDefault();
-    setPublicando(true);
     setFormError(null);
+    const { valor: urgenteHasta, error: urgenciaError } =
+      urgenteHastaDesdeCampo(urgencia, Date.now());
+    if (urgenciaError) {
+      setFormError(urgenciaError);
+      return;
+    }
+    setPublicando(true);
     try {
       const nuevo = await crearAnuncio({
         edificioId: edificio.id,
         titulo,
         contenido,
         userId,
+        urgenteHasta,
       });
       setAnuncios((actuales) => [nuevo, ...(actuales || [])]);
       setPublicadoOk(true);
@@ -90,6 +114,7 @@ export default function AnunciosTab({ edificio }) {
         setPublicadoOk(false);
         setTitulo("");
         setContenido("");
+        setUrgencia(URGENCIA_VACIA);
       }, 1400);
     } catch (error) {
       setFormError(mensajeDeError(error, "No se pudo publicar el anuncio."));
@@ -102,17 +127,25 @@ export default function AnunciosTab({ edificio }) {
     setEditandoId(anuncio.id);
     setEditTitulo(anuncio.titulo);
     setEditContenido(anuncio.contenido);
+    setEditUrgencia(urgenciaDesdeAnuncio(anuncio, ahora));
     setEditError(null);
   }
 
   async function handleGuardarEdicion(e) {
     e.preventDefault();
-    setGuardando(true);
     setEditError(null);
+    const { valor: urgenteHasta, error: urgenciaError } =
+      urgenteHastaDesdeCampo(editUrgencia, Date.now());
+    if (urgenciaError) {
+      setEditError(urgenciaError);
+      return;
+    }
+    setGuardando(true);
     try {
       const actualizado = await actualizarAnuncio(editandoId, {
         titulo: editTitulo,
         contenido: editContenido,
+        urgenteHasta,
       });
       setAnuncios((actuales) =>
         actuales.map((a) => (a.id === actualizado.id ? actualizado : a)),
@@ -212,6 +245,14 @@ export default function AnunciosTab({ edificio }) {
               className={inputClass}
             />
           </div>
+          <CampoUrgente
+            idPrefijo="nuevo"
+            value={urgencia}
+            onChange={setUrgencia}
+            ahora={ahora}
+            otrosUrgentes={urgentesVigentes}
+            disabled={publicando}
+          />
           <ModalFormButton
             loading={publicando}
             label="Publicar anuncio"
@@ -285,6 +326,16 @@ export default function AnunciosTab({ edificio }) {
                   className={inputClass}
                 />
               </div>
+              <CampoUrgente
+                idPrefijo={`edit-${editandoId}`}
+                value={editUrgencia}
+                onChange={setEditUrgencia}
+                ahora={ahora}
+                otrosUrgentes={urgentesVigentes.filter(
+                  (anuncio) => anuncio.id !== editandoId,
+                )}
+                disabled={guardando}
+              />
               {editError && (
                 <div
                   role="alert"
@@ -324,6 +375,19 @@ export default function AnunciosTab({ edificio }) {
                   <p className="mt-0.5 text-xs text-stone-400">
                     Publicado el {formatearFechaHora(anuncio.creado_en)}
                   </p>
+                  {anuncio.urgente_hasta && (
+                    <p
+                      className={`mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        esUrgente(anuncio, ahora)
+                          ? "bg-brand-100 text-brand-800"
+                          : "bg-stone-100 text-stone-500"
+                      }`}
+                    >
+                      {esUrgente(anuncio, ahora)
+                        ? `Urgente hasta el ${formatearFechaHora(anuncio.urgente_hasta)}`
+                        : `Fue urgente hasta el ${formatearFechaHora(anuncio.urgente_hasta)}`}
+                    </p>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <button
