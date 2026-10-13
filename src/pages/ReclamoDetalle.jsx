@@ -12,7 +12,7 @@ import {
 import { mensajeDeError } from "../utils/supabase-errors";
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
 const statusLabels = {
   abierto: "Activo",
   en_curso: "En curso",
@@ -203,7 +203,7 @@ export default function ReclamoDetalle() {
         <button
           type="button"
           onClick={() => navigate(volverA)}
-          className="mb-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+          className="mb-4 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:bg-stone-200 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
         >
           <svg
             aria-hidden="true"
@@ -277,7 +277,7 @@ export default function ReclamoDetalle() {
                           href={imageUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="group aspect-[16/10] overflow-hidden rounded-lg border border-stone-200 bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+                          className="group aspect-[16/10] overflow-hidden rounded-lg border border-stone-200 bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
                         >
                           <img
                             src={imageUrl}
@@ -357,7 +357,7 @@ export default function ReclamoDetalle() {
                       type="button"
                       disabled={saving || !hayCambios}
                       onClick={handleSaveChanges}
-                      className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
+                      className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
                     >
                       {saving ? "Guardando..." : "Guardar cambios"}
                     </button>
@@ -445,7 +445,7 @@ export default function ReclamoDetalle() {
                 <button
                   type="submit"
                   disabled={saving || !comment.trim()}
-                  className="mt-3 rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving ? "Guardando..." : "Comentar"}
                 </button>

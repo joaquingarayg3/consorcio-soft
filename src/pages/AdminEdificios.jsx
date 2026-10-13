@@ -79,7 +79,7 @@ function ReclamosAbiertos({ cantidad }) {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 // Las columnas de escritorio se comparten entre el encabezado y las filas.
@@ -94,7 +94,7 @@ function FilaEdificio({ edificio, reclamos, unidades }) {
     <li>
       <Link
         href={`/admin/edificios/${edificio.id}`}
-        className={`group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-600/50 lg:grid lg:gap-4 lg:px-5 ${COLUMNAS}`}
+        className={`group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600/50 lg:grid lg:gap-4 lg:px-5 ${COLUMNAS}`}
       >
         <div
           aria-hidden="true"
@@ -167,7 +167,7 @@ function FilaEdificio({ edificio, reclamos, unidades }) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600 lg:hidden"
+          className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600 lg:hidden"
         >
           <path d="m9 18 6-6-6-6" />
         </svg>
@@ -313,7 +313,7 @@ export default function AdminEdificios() {
           <button
             type="button"
             onClick={() => setFormAbierto(true)}
-            className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
+            className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 sm:w-auto sm:py-2"
           >
             + Nuevo edificio
           </button>
@@ -460,7 +460,7 @@ export default function AdminEdificios() {
                 type="button"
                 onClick={() => setBusqueda("")}
                 aria-label="Borrar búsqueda"
-                className="absolute top-1/2 right-1.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+                className="absolute top-1/2 right-1.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
               >
                 <svg
                   aria-hidden="true"
@@ -481,7 +481,7 @@ export default function AdminEdificios() {
               type="button"
               aria-pressed={soloConReclamos}
               onClick={() => setSoloConReclamos((v) => !v)}
-              className={`shrink-0 whitespace-nowrap rounded-lg border px-3.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+              className={`shrink-0 whitespace-nowrap rounded-lg border px-3.5 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
                 soloConReclamos
                   ? "border-red-300 bg-red-50 text-red-700"
                   : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"

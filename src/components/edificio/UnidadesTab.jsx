@@ -19,7 +19,7 @@ function obtenerUnidades(edificioId) {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 const asignacionActiva = (a) => asignacionVigente(a);
 
@@ -364,7 +364,7 @@ export default function UnidadesTab({ edificioId }) {
         <button
           type="button"
           onClick={() => setFormUnidadAbierto(true)}
-          className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900"
+          className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900"
         >
           + Nueva unidad
         </button>
@@ -595,7 +595,7 @@ export default function UnidadesTab({ edificioId }) {
                     <button
                       type="submit"
                       disabled={guardandoEdicion}
-                      className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
+                      className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
                     >
                       {guardandoEdicion ? "Guardando..." : "Guardar cambios"}
                     </button>
@@ -669,7 +669,7 @@ export default function UnidadesTab({ edificioId }) {
                           {usuarioAsignado ? (
                             <Link
                               href={`/admin/usuarios/${usuarioAsignado.id}`}
-                              className="font-medium hover:text-amber-700 hover:underline"
+                              className="font-medium hover:text-brand-700 hover:underline"
                             >
                               {usuarioAsignado.nombre}{" "}
                               {usuarioAsignado.apellido}

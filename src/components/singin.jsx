@@ -60,7 +60,7 @@ export default function Singin() {
             aria-invalid={error ? "true" : "false"}
             aria-describedby={error ? "singin-error" : undefined}
             disabled={isPending}
-            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400"
           />
         </div>
 
@@ -81,7 +81,7 @@ export default function Singin() {
             aria-invalid={error ? "true" : "false"}
             aria-describedby={error ? "singin-error" : undefined}
             disabled={isPending}
-            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400"
           />
         </div>
 
@@ -89,7 +89,7 @@ export default function Singin() {
           type="submit"
           aria-busy={isPending}
           disabled={isPending}
-          className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
+          className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
         >
           {isPending ? "Iniciando sesión..." : "Iniciar sesión"}
         </button>

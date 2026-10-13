@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import AppHeader from "../components/AppHeader";
+import { Isotipo, PieMarca } from "../components/Marca";
 import imagenEdificios from "../assets/home/edificios.jpg";
 import imagenReclamos from "../assets/home/reclamos.jpg";
 import imagenUsuarios from "../assets/home/usuarios.jpg";
@@ -114,7 +115,7 @@ function AccesoCard({ acceso }) {
   return (
     <Link
       href={acceso.href}
-      className={`group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+      className={`group flex items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-amber-300 hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
         conImagen
           ? "lg:flex-col lg:items-stretch lg:gap-0 lg:overflow-hidden lg:p-0 lg:hover:-translate-y-1 lg:active:scale-100"
           : ""
@@ -172,7 +173,7 @@ function AccesoCard({ acceso }) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-amber-600"
+          className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600"
         >
           <path d="m9 18 6-6-6-6" />
         </svg>
@@ -193,26 +194,7 @@ export default function Home() {
         <div
           className={`flex w-full ${ANCHO} items-center gap-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:p-6`}
         >
-          <div
-            aria-hidden="true"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5"
-            >
-              <path d="M3 21h18" />
-              <path d="M6 21V8l6-4 6 4v13" />
-              <path d="M10 21v-6h4v6" />
-              <path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
-            </svg>
-          </div>
+          <Isotipo className="h-12 w-12 shrink-0 lg:h-14 lg:w-14" />
           <div className="min-w-0 text-left">
             <p className="font-semibold text-stone-900">¡Bienvenido/a!</p>
             <p className="truncate text-sm text-stone-500">
@@ -247,6 +229,7 @@ export default function Home() {
             </div>
           </div>
         )}
+        <PieMarca className="mt-12 lg:mt-20" />
       </main>
     </div>
   );

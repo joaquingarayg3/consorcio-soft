@@ -12,7 +12,7 @@ import { mensajeDeError } from "../utils/supabase-errors";
 import { coincideBusqueda } from "../utils/texto";
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50";
+  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
 const labelClass =
   "mb-1 block text-xs font-medium uppercase tracking-wide text-stone-500";
 const statusLabels = {
@@ -132,7 +132,7 @@ function ClaimRow({
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") navigate(detailPath);
       }}
-      className="cursor-pointer border-t border-stone-100 transition-colors hover:bg-amber-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-600/50"
+      className="cursor-pointer border-t border-stone-100 transition-colors hover:bg-amber-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600/50"
     >
       <td
         className={`px-4 py-4 align-top text-xs font-medium text-stone-400 ${
@@ -202,7 +202,7 @@ function ClaimRow({
               onChange={(event) =>
                 onPriorityChange(claim.id, event.target.value)
               }
-              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-amber-600 focus:outline-none"
+              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-brand-600 focus:outline-none"
             >
               {priorities.map((option) => (
                 <option key={option}>{option}</option>
@@ -605,7 +605,7 @@ export default function ClaimsPanel({ edificio = null }) {
                 ? "Cargá una unidad funcional para poder crear un reclamo"
                 : "Necesitás una unidad asignada para crear un reclamo"
           }
-          className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
+          className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
         >
           + Nuevo reclamo
         </button>
@@ -686,7 +686,7 @@ export default function ClaimsPanel({ edificio = null }) {
                     aria-label="Filtrar por edificio"
                     value={edificioFilter}
                     onChange={(event) => setEdificioFilter(event.target.value)}
-                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-amber-600 focus:outline-none"
+                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-600 focus:outline-none"
                   >
                     <option value="todos">Todos los edificios</option>
                     {edificiosConReclamos.map((item) => (
@@ -700,7 +700,7 @@ export default function ClaimsPanel({ edificio = null }) {
                     type="button"
                     aria-pressed={agrupar}
                     onClick={() => setAgrupar((valor) => !valor)}
-                    className={`whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+                    className={`whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
                       agrupar
                         ? "border-amber-300 bg-amber-50 text-amber-800"
                         : "border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
@@ -714,7 +714,7 @@ export default function ClaimsPanel({ edificio = null }) {
                 aria-label="Filtrar por categoría"
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
-                className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-amber-600 focus:outline-none"
+                className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-600 focus:outline-none"
               >
                 <option value="todas">Todas las categorías</option>
                 {categories.map((value) => (
@@ -767,7 +767,7 @@ export default function ClaimsPanel({ edificio = null }) {
                 {historyClaims.length} cerrados
               </span>
             </span>
-            <span className="text-sm font-medium text-amber-700">
+            <span className="text-sm font-medium text-brand-700">
               {historyOpen ? "Ocultar" : "Ver historial"}
             </span>
           </button>

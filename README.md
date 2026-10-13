@@ -1,6 +1,24 @@
+<p align="center">
+  <img src="src/assets/brand/logotipo.png" alt="SMPH - Supervisión y Mantenimiento Propiedad Horizontal" width="200" />
+</p>
+
 # Consorcio Soft
 
 Aplicacion para gestionar edificios, unidades, usuarios y reclamos de mantenimiento con React, Vite y Supabase.
+
+## Marca y colores
+
+El nombre es **Supervisión y Mantenimiento Propiedad Horizontal (SMPH)**. El logotipo y el isotipo están en `src/assets/brand/`; los íconos de la pestaña del navegador y del celular, en `public/`. El nombre y las siglas se definen en `src/utils/marca.js`, y los componentes de marca (`Isotipo`, `Logotipo`, `FranjaMarca`, `PieMarca`) en `src/components/Marca.jsx`.
+
+Los colores salen del logo y se definen una sola vez, en `src/index.css`:
+
+| Color | Valor | Se usa en |
+| --- | --- | --- |
+| Rojo (`brand-700`) | `#A8031A` | Botones y enlaces principales |
+| Naranja (`amber-500`) | `#ED8214` | Acentos, fichas y avisos suaves |
+| Gris carbón (`stone-800`) | `#2C323A` | Textos, bordes y fondos neutros |
+
+En la app, `amber` y `stone` son estas escalas de marca (no las de Tailwind). Rojo, verde y azul "normales" (`red`, `green`, `blue`) quedan para alertas, éxito y estados.
 
 ## Requisitos
 

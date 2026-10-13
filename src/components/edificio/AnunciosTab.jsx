@@ -15,7 +15,7 @@ const MAX_TITULO = 120;
 const MAX_CONTENIDO = 4000;
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 function Contador({ valor, maximo }) {
@@ -155,7 +155,7 @@ export default function AnunciosTab({ edificio }) {
         <button
           type="button"
           onClick={() => setFormAbierto(true)}
-          className="w-full shrink-0 whitespace-nowrap rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
+          className="w-full shrink-0 whitespace-nowrap rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 sm:w-auto sm:py-2"
         >
           + Nuevo anuncio
         </button>
@@ -305,7 +305,7 @@ export default function AnunciosTab({ edificio }) {
                 <button
                   type="submit"
                   disabled={guardando}
-                  className="rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-amber-300"
+                  className="rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
                 >
                   {guardando ? "Guardando..." : "Guardar cambios"}
                 </button>

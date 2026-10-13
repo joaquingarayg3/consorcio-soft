@@ -28,7 +28,7 @@ function obtenerUnidadesAsignadas(id) {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 const ROLES = [
@@ -135,7 +135,7 @@ function FilaAsignacion({ asignacion, vigente }) {
         {unidad?.edificio_id && (
           <Link
             href={`/admin/edificios/${unidad.edificio_id}/unidades`}
-            className="text-xs font-medium text-amber-700 hover:text-amber-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            className="text-xs font-medium text-brand-700 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
           >
             Ver en el edificio →
           </Link>
@@ -472,7 +472,7 @@ export default function AdminUsuarioDetalle() {
               <button
                 type="submit"
                 disabled={guardando}
-                className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-300"
+                className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
               >
                 {guardando ? "Guardando..." : "Guardar cambios"}
               </button>
@@ -514,7 +514,7 @@ export default function AdminUsuarioDetalle() {
                 </div>
                 <Link
                   href={destinoGestion}
-                  className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+                  className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-center text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
                 >
                   {etiquetaGestion} →
                 </Link>

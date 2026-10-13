@@ -12,7 +12,7 @@ export function ModalFormButton({ loading, label, loadingLabel }) {
     <button
       type="submit"
       disabled={loading}
-      className="relative flex h-11 w-full items-center justify-center overflow-hidden rounded-lg bg-amber-700 text-base font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:bg-amber-400"
+      className="relative flex h-11 w-full items-center justify-center overflow-hidden rounded-lg bg-brand-700 text-base font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
     >
       <AnimatePresence mode="popLayout" initial={false}>
         {loading ? (
@@ -214,7 +214,7 @@ export default function ModalForm({
                       disabled={busy}
                       onClick={onClose}
                       aria-label="Cerrar"
-                      className="rounded-lg px-2 py-1 text-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 disabled:opacity-50"
+                      className="rounded-lg px-2 py-1 text-xl text-stone-400 hover:bg-stone-100 hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 disabled:opacity-50"
                     >
                       ×
                     </button>

@@ -15,7 +15,7 @@ const etiquetaDe = (vinculo) =>
   VINCULOS.find((v) => v.valor === vinculo)?.etiqueta ?? vinculo;
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 
 function iniciales(usuario) {
   const letras = `${usuario.nombre?.[0] ?? ""}${usuario.apellido?.[0] ?? ""}`;
@@ -178,7 +178,7 @@ export default function AsignarUsuarioForm({
                   disabled={asignando}
                   aria-pressed={elegido}
                   onClick={() => setSeleccionado(usuario)}
-                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-600/50 disabled:cursor-not-allowed ${
+                  className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600/50 disabled:cursor-not-allowed ${
                     elegido ? "bg-amber-50" : "hover:bg-stone-50"
                   }`}
                 >
@@ -186,7 +186,7 @@ export default function AsignarUsuarioForm({
                     aria-hidden="true"
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
                       elegido
-                        ? "bg-amber-700 text-white"
+                        ? "bg-brand-700 text-white"
                         : "bg-stone-100 text-stone-600"
                     }`}
                   >
@@ -262,7 +262,7 @@ export default function AsignarUsuarioForm({
           {VINCULOS.map(({ valor, etiqueta }) => (
             <label
               key={valor}
-              className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-amber-600/50 ${
+              className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-3 text-sm font-semibold transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-600/50 ${
                 vinculo === valor
                   ? "bg-white text-stone-900 shadow-sm"
                   : "text-stone-600 hover:text-stone-900"

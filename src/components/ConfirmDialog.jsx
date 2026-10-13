@@ -64,7 +64,7 @@ export default function ConfirmDialog({
             className={
               danger
                 ? "rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 active:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
-                : "rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
+                : "rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60 sm:py-2"
             }
           >
             {pending ? "Procesando..." : confirmLabel}

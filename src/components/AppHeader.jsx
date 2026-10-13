@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { FranjaMarca, Isotipo } from "./Marca";
+import { NOMBRE_MARCA, SIGLAS } from "../utils/marca";
 import supabase from "../supabase-client";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
@@ -161,10 +163,11 @@ export default function AppHeader({ backTo }) {
 
   return (
     <header
-      className={`grid items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
+      className={`relative grid items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
         backTo ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"
       }`}
     >
+      <FranjaMarca className="absolute inset-x-0 top-0" />
       {backTo && (
         <Link
           href={backTo}
@@ -187,13 +190,26 @@ export default function AppHeader({ backTo }) {
         </Link>
       )}
 
-      <span
-        className={`min-w-0 truncate text-sm font-bold text-stone-900 sm:text-lg ${
-          backTo ? "text-center" : "text-left"
+      <Link
+        href="/home"
+        aria-label={`${NOMBRE_MARCA}: ir al inicio`}
+        className={`flex min-w-0 items-center gap-2.5 rounded-lg py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
+          backTo ? "justify-center" : "justify-start"
         }`}
       >
-        Supervisión y Mantenimiento
-      </span>
+        <Isotipo className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+        <span aria-hidden="true" className="min-w-0 leading-tight">
+          <span className="block text-base font-extrabold tracking-wider text-stone-800 sm:hidden">
+            {SIGLAS}
+          </span>
+          <span className="hidden truncate text-base font-bold text-stone-900 sm:block lg:text-lg">
+            Supervisión y Mantenimiento
+          </span>
+          <span className="hidden truncate text-[11px] font-medium tracking-[0.18em] text-stone-500 uppercase sm:block">
+            Propiedad Horizontal
+          </span>
+        </span>
+      </Link>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <div className="relative">
@@ -202,7 +218,7 @@ export default function AppHeader({ backTo }) {
             aria-label={`Notificaciones${totalNuevas ? `: ${totalNuevas} nuevas` : ""}`}
             aria-expanded={notificationsOpen}
             onClick={handleNotificationsOpen}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
           >
             <svg
               aria-hidden="true"
@@ -231,7 +247,7 @@ export default function AppHeader({ backTo }) {
                 <Link
                   href="/reclamos"
                   onClick={() => setNotificationsOpen(false)}
-                  className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                  className="text-xs font-medium text-brand-700 hover:text-brand-800"
                 >
                   Ver reclamos
                 </Link>
@@ -245,7 +261,7 @@ export default function AppHeader({ backTo }) {
                     <Link
                       href="/anuncios"
                       onClick={() => setNotificationsOpen(false)}
-                      className="text-xs font-medium text-amber-700 hover:text-amber-800"
+                      className="text-xs font-medium text-brand-700 hover:text-brand-800"
                     >
                       Ver todos
                     </Link>
@@ -262,7 +278,7 @@ export default function AppHeader({ backTo }) {
                           <>
                             <span
                               aria-hidden="true"
-                              className="h-2 w-2 shrink-0 rounded-full bg-amber-600"
+                              className="h-2 w-2 shrink-0 rounded-full bg-brand-600"
                             />
                             <span className="sr-only">Nuevo: </span>
                           </>
@@ -329,14 +345,14 @@ export default function AppHeader({ backTo }) {
               setNotificationsOpen(false);
               setProfileOpen((open) => !open);
             }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
           >
             {initial}
           </button>
           {profileOpen && (
             <div className="absolute right-0 top-12 z-50 w-72 rounded-xl border border-stone-200 bg-white p-4 shadow-xl">
               <div className="flex items-center gap-3 border-b border-stone-100 pb-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-700 text-sm font-semibold text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white">
                   {initial}
                 </div>
                 <div className="min-w-0">

@@ -38,7 +38,7 @@ function Chip({ activo, onClick, children }) {
       type="button"
       aria-pressed={activo}
       onClick={onClick}
-      className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+      className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
         activo
           ? "border-amber-300 bg-amber-100 text-amber-900"
           : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"
@@ -61,7 +61,7 @@ function generarContrasena() {
 }
 
 const inputClass =
-  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-600/20 disabled:bg-stone-50 disabled:text-stone-400";
+  "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 
 export default function AdminUsuarios() {
@@ -376,7 +376,7 @@ export default function AdminUsuarios() {
               setFormAbierto(true);
               setCredencialesCreadas(null);
             }}
-            className="w-full rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:bg-amber-900 sm:w-auto sm:py-2"
+            className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 sm:w-auto sm:py-2"
           >
             + Nuevo usuario
           </button>
@@ -489,7 +489,7 @@ export default function AdminUsuarios() {
                     type="button"
                     onClick={() => setPassword(generarContrasena())}
                     disabled={creando}
-                    className="text-amber-700 hover:text-amber-800 hover:underline disabled:opacity-50"
+                    className="text-brand-700 hover:text-brand-800 hover:underline disabled:opacity-50"
                   >
                     Generar otra
                   </button>
@@ -497,7 +497,7 @@ export default function AdminUsuarios() {
                     type="button"
                     onClick={escribirPropiaContrasena}
                     disabled={creando}
-                    className="text-amber-700 hover:text-amber-800 hover:underline disabled:opacity-50"
+                    className="text-brand-700 hover:text-brand-800 hover:underline disabled:opacity-50"
                   >
                     Escribir la mía
                   </button>
@@ -671,7 +671,7 @@ export default function AdminUsuarios() {
                 type="button"
                 onClick={() => cambiarBusqueda("")}
                 aria-label="Borrar búsqueda"
-                className="absolute top-1/2 right-1.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50"
+                className="absolute top-1/2 right-1.5 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
               >
                 <svg
                   aria-hidden="true"
@@ -854,7 +854,7 @@ export default function AdminUsuarios() {
                       <td className="px-4 py-3">
                         <Link
                           href={`/admin/usuarios/${u.id}`}
-                          className="font-medium text-stone-900 hover:text-amber-700 hover:underline"
+                          className="font-medium text-stone-900 hover:text-brand-700 hover:underline"
                         >
                           {u.nombre} {u.apellido}
                         </Link>

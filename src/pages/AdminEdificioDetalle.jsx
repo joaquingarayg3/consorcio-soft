@@ -107,7 +107,7 @@ export default function AdminEdificioDetalle() {
                     key={t.key}
                     href={`/admin/edificios/${id}/${t.key}`}
                     aria-current={activa ? "page" : undefined}
-                    className={`flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold sm:px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600/50 ${
+                    className={`flex min-h-11 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-3 text-sm font-semibold sm:px-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
                       activa
                         ? "bg-white text-stone-900 shadow-sm"
                         : "text-stone-600 hover:text-stone-900"

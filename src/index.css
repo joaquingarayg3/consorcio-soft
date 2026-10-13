@@ -1,1 +1,50 @@
 @import "tailwindcss";
+
+/*
+ * Colores de la marca SMPH, tomados del logo:
+ *   rojo    #A8031A  -> brand-700 (botones y enlaces principales)
+ *   naranja #ED8214  -> amber-500 (acentos, resaltados, avisos suaves)
+ *   carbón  #2C323A  -> stone-800 (textos, bordes y fondos neutros)
+ *
+ * Se redefinen las escalas amber y stone de Tailwind en vez de renombrar las
+ * clases: en toda la app "amber" ahora es el naranja de la marca y "stone" el
+ * gris carbón. El rojo de brand es el color principal; rojo, verde y azul
+ * "normales" (red, green, blue) siguen siendo los de alerta, éxito y estado.
+ */
+@theme {
+  --color-brand-50: #fef0f3;
+  --color-brand-100: #fde2e6;
+  --color-brand-200: #fac6ce;
+  --color-brand-300: #f49aa7;
+  --color-brand-400: #e85e73;
+  --color-brand-500: #e61938;
+  --color-brand-600: #c40824;
+  --color-brand-700: #a5031c;
+  --color-brand-800: #860418;
+  --color-brand-900: #660514;
+  --color-brand-950: #39050c;
+
+  --color-amber-50: #fff7f0;
+  --color-amber-100: #feebd7;
+  --color-amber-200: #fdd6b0;
+  --color-amber-300: #fabd80;
+  --color-amber-400: #f59e47;
+  --color-amber-500: #ed8012;
+  --color-amber-600: #c96b0d;
+  --color-amber-700: #a8590b;
+  --color-amber-800: #84470b;
+  --color-amber-900: #65380b;
+  --color-amber-950: #3a2108;
+
+  --color-stone-50: #f6f7f8;
+  --color-stone-100: #eeeff2;
+  --color-stone-200: #e0e3e6;
+  --color-stone-300: #c6cbd2;
+  --color-stone-400: #9ba2ab;
+  --color-stone-500: #656e79;
+  --color-stone-600: #545d69;
+  --color-stone-700: #414953;
+  --color-stone-800: #2c323a;
+  --color-stone-900: #1f2328;
+  --color-stone-950: #14171a;
+}

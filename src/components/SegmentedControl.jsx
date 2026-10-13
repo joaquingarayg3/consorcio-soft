@@ -31,7 +31,7 @@ export default function SegmentedControl({
           return (
             <label
               key={option.value}
-              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-1 text-[13px] font-semibold whitespace-nowrap sm:px-2 sm:text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-amber-600/50 ${
+              className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-1 text-[13px] font-semibold whitespace-nowrap sm:px-2 sm:text-sm transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-600/50 ${
                 elegida
                   ? `${option.activa} shadow-sm`
                   : "text-stone-600 hover:bg-white/70 hover:text-stone-900"
