@@ -4,6 +4,8 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ModalForm, { ModalFormButton } from "../components/ModalForm";
 import { mensajeDeError } from "../utils/supabase-errors";
+import ImagenEdificio from "../components/ImagenEdificio";
+import { useUrlsFotos } from "../hooks/useUrlsFotos";
 import { coincideBusqueda } from "../utils/texto";
 import {
   CODIGO_EDIFICIO,
@@ -90,7 +92,7 @@ const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 // Las columnas de escritorio se comparten entre el encabezado y las filas.
 const COLUMNAS = "lg:grid-cols-[2.75rem_minmax(0,1fr)_7rem_11rem_10rem]";
 
-function FilaEdificio({ edificio, reclamos, unidades }) {
+function FilaEdificio({ edificio, reclamos, unidades, miniatura }) {
   const ubicacion = [edificio.direccion, edificio.ciudad]
     .filter(Boolean)
     .join(" · ");
@@ -101,24 +103,31 @@ function FilaEdificio({ edificio, reclamos, unidades }) {
         href={`/admin/edificios/${edificio.id}`}
         className={`group flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-amber-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-600/50 lg:grid lg:gap-4 lg:px-5 ${COLUMNAS}`}
       >
-        <div
-          aria-hidden="true"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
+        {miniatura ? (
+          <ImagenEdificio
+            src={miniatura}
+            className="h-11 w-11 shrink-0 rounded-xl"
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"
           >
-            <rect x="6" y="3" width="12" height="18" rx="1" />
-            <path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
-            <path d="M3 21h18" />
-          </svg>
-        </div>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5"
+            >
+              <rect x="6" y="3" width="12" height="18" rx="1" />
+              <path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
+              <path d="M3 21h18" />
+            </svg>
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-stone-900">
@@ -253,6 +262,10 @@ export default function AdminEdificios() {
       // sin almacenamiento: la búsqueda simplemente no se recuerda
     }
   }, [busqueda]);
+
+  const urlsMiniaturas = useUrlsFotos(
+    (edificios ?? []).map((ed) => ed.miniatura_path),
+  );
 
   const totalConReclamos = useMemo(
     () => (edificios ?? []).filter((ed) => abiertos[ed.id] > 0).length,
@@ -578,6 +591,7 @@ export default function AdminEdificios() {
                   <FilaEdificio
                     key={ed.id}
                     edificio={ed}
+                    miniatura={urlsMiniaturas[ed.miniatura_path]}
                     reclamos={abiertos[ed.id] ?? 0}
                     unidades={unidades ? (unidades[ed.id] ?? 0) : null}
                   />

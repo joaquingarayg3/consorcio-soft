@@ -15,7 +15,7 @@ export async function fetchMisAsignaciones(userId) {
   const { data, error } = await supabase
     .from("unidad_usuarios")
     .select(
-      "id, vinculo, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso, tipo, edificio_id, edificio:edificio_id ( id, nombre, codigo ) )",
+      "id, vinculo, fecha_desde, fecha_hasta, unidad_funcional:unidad_id ( id, identificador, piso, tipo, edificio_id, edificio:edificio_id ( id, nombre, codigo, foto_path, miniatura_path ) )",
     )
     .eq("usuario_id", userId)
     .lte("fecha_desde", fecha);

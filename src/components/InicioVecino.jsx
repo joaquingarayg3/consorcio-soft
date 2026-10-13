@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import { useAhora } from "../hooks/useAhora";
 import { useAnunciosUsuario } from "../hooks/useAnunciosUsuario";
+import { useUrlsFotos } from "../hooks/useUrlsFotos";
 import { fetchMisReclamosActivos } from "../services/claims";
 import { fetchMisAsignaciones } from "../services/vecino";
 import { esUrgente } from "../utils/anuncios";
@@ -10,6 +11,7 @@ import { tiempoRelativo } from "../utils/fechas";
 import { mensajeDeError } from "../utils/supabase-errors";
 import { etiquetaReclamo } from "../utils/tickets";
 import AvisosUrgentes from "./AvisosUrgentes";
+import PortadaEdificios from "./PortadaEdificios";
 import SelectorUnidad from "./SelectorUnidad";
 import TarjetaAnuncio from "./TarjetaAnuncio";
 
@@ -238,8 +240,44 @@ export default function InicioVecino() {
 
   const unicaUnidad = misUnidades.length === 1 ? misUnidades[0] : null;
 
+  // Edificios de la persona (uno por edificio, con su primera unidad) para la
+  // portada: con una unidad a la vista, la foto grande de su edificio; con
+  // "Todas", una tira de miniaturas.
+  const edificiosPorId = new Map();
+  for (const a of misUnidades) {
+    const idEdificio = a.unidad_funcional.edificio_id;
+    if (!edificiosPorId.has(idEdificio)) {
+      edificiosPorId.set(idEdificio, {
+        id: idEdificio,
+        nombre: a.unidad_funcional.edificio?.nombre ?? "Edificio",
+        foto_path: a.unidad_funcional.edificio?.foto_path ?? null,
+        miniatura_path: a.unidad_funcional.edificio?.miniatura_path ?? null,
+        unidadId: a.unidad_funcional.id,
+      });
+    }
+  }
+  const edificiosMios = [...edificiosPorId.values()];
+  const edificioMirado =
+    seleccion !== "todas"
+      ? edificiosMios.find((e) => edificiosVistos.has(e.id))
+      : edificiosMios.length === 1
+        ? edificiosMios[0]
+        : null;
+  const urlsFotos = useUrlsFotos(
+    edificiosMios.flatMap((e) => [e.foto_path, e.miniatura_path]),
+  );
+
   return (
     <div className="mx-auto w-full max-w-md space-y-6 sm:max-w-2xl lg:max-w-5xl">
+      {misUnidades.length > 0 && (
+        <PortadaEdificios
+          edificios={edificiosMios}
+          mirado={edificioMirado}
+          urls={urlsFotos}
+          onElegir={elegirUnidad}
+        />
+      )}
+
       <section aria-label="Tu unidad" className="space-y-3">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="min-w-0">
