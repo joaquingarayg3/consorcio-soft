@@ -4,8 +4,14 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EliminarUsuarioForm from "../components/EliminarUsuarioForm";
+import EstadoUsuario from "../components/EstadoUsuario";
 import ModalForm, { ModalFormButton } from "../components/ModalForm";
-import { buscarPerfiles, USUARIOS_POR_PAGINA } from "../services/usuarios";
+import {
+  buscarPerfiles,
+  contarPendientes,
+  USUARIOS_POR_PAGINA,
+} from "../services/usuarios";
+import { estadoPerfil } from "../utils/usuarios";
 import {
   getAdminFunctionErrorMessage,
   mensajeDeError,
@@ -32,7 +38,7 @@ function Filtro({ etiqueta, children }) {
   );
 }
 
-function Chip({ activo, onClick, children }) {
+function Chip({ activo, onClick, contador, children }) {
   return (
     <button
       type="button"
@@ -45,7 +51,54 @@ function Chip({ activo, onClick, children }) {
       }`}
     >
       {children}
+      {contador > 0 && (
+        <span className="ml-1.5 inline-block min-w-5 rounded-full bg-brand-700 px-1.5 text-center text-xs font-semibold text-white">
+          {contador}
+        </span>
+      )}
     </button>
+  );
+}
+
+// Botones de una fila de la lista, según el estado de la cuenta:
+//   pendiente → Aprobar / Rechazar     activo → Dar de baja
+//   de baja   → Reactivar / Eliminar
+function AccionesUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
+  const estado = estadoPerfil(usuario);
+  const secundario =
+    "rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50";
+  const peligro =
+    "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+  return (
+    <div className="flex gap-2">
+      {estado !== "activo" && (
+        <button
+          type="button"
+          onClick={() => onEliminar(usuario)}
+          disabled={ocupado}
+          className={peligro}
+        >
+          {estado === "pendiente" ? "Rechazar" : "Eliminar"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onCambiarEstado(usuario)}
+        disabled={ocupado}
+        className={
+          estado === "pendiente"
+            ? "rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
+            : secundario
+        }
+      >
+        {estado === "activo"
+          ? "Dar de baja"
+          : estado === "pendiente"
+            ? "Aprobar"
+            : "Reactivar"}
+      </button>
+    </div>
   );
 }
 
@@ -93,6 +146,8 @@ export default function AdminUsuarios() {
 
   const [accionPendiente, setAccionPendiente] = useState(null);
   const [confirmandoBaja, setConfirmandoBaja] = useState(null);
+  const [pendientes, setPendientes] = useState(null);
+  const [personaAprobada, setPersonaAprobada] = useState(null);
 
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
@@ -142,6 +197,19 @@ export default function AdminUsuarios() {
 
     cargarUnidades();
   }, [edificioId]);
+
+  // Cuántas solicitudes esperan aprobación: se vuelve a contar tras cada cambio.
+  useEffect(() => {
+    let vigente = true;
+    contarPendientes()
+      .then((cantidad) => {
+        if (vigente) setPendientes(cantidad);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [recarga]);
 
   const textoBuscado = busqueda.trim();
   // Identifica la consulta en curso: mientras el resultado guardado no sea el de
@@ -285,6 +353,7 @@ export default function AdminUsuarios() {
 
   async function handleCambiarEstado(usuario, activar) {
     setAccionPendiente(usuario.id);
+    setPersonaAprobada(null);
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: {
         action: activar ? "reactivate" : "deactivate",
@@ -302,6 +371,12 @@ export default function AdminUsuarios() {
         ),
       );
       return;
+    }
+    if (activar && estadoPerfil(usuario) === "pendiente") {
+      setPersonaAprobada(
+        `${usuario.nombre ?? ""} ${usuario.apellido ?? ""}`.trim() ||
+          usuario.email,
+      );
     }
     recargar();
   }
@@ -378,9 +453,59 @@ export default function AdminUsuarios() {
             }}
             className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 sm:w-auto sm:py-2"
           >
-            + Nuevo usuario
+            + Crear usuario manualmente
           </button>
         </div>
+
+        {personaAprobada && (
+          <div
+            role="status"
+            className="mt-4 flex items-start justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+          >
+            <p>
+              <span className="font-medium">{personaAprobada}</span> ya puede
+              ingresar. Para que vea algo, asignale su unidad desde el edificio
+              correspondiente.{" "}
+              <Link
+                href="/admin/edificios"
+                className="font-semibold text-green-800 underline hover:text-green-900"
+              >
+                Ir a Edificios
+              </Link>
+            </p>
+            <button
+              type="button"
+              onClick={() => setPersonaAprobada(null)}
+              aria-label="Cerrar aviso"
+              className="-my-1 shrink-0 rounded px-1.5 text-lg leading-none text-green-700 hover:bg-green-100"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {pendientes > 0 && estadoFiltro !== "pendientes" && (
+          <div
+            role="status"
+            className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p>
+              <span className="font-semibold">
+                {pendientes === 1
+                  ? "1 persona espera"
+                  : `${pendientes} personas esperan`}
+              </span>{" "}
+              que apruebes su acceso.
+            </p>
+            <button
+              type="button"
+              onClick={() => cambiarEstado("pendientes")}
+              className="shrink-0 rounded-lg bg-amber-500 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
+            >
+              Ver solicitudes
+            </button>
+          </div>
+        )}
 
         {usuarioEliminado && (
           <div
@@ -427,7 +552,7 @@ export default function AdminUsuarios() {
           }}
           busy={creando}
           title="Nuevo usuario"
-          description="Completá los datos para dar de alta a la persona."
+          description="Para cuentas que crea la administración (por ejemplo, otro administrador). Los vecinos se registran solos y acá solo se aprueban."
         >
           <form onSubmit={handleCrearUsuario} className="space-y-4">
             <div className="flex gap-3">
@@ -696,6 +821,13 @@ export default function AdminUsuarios() {
                 Todos
               </Chip>
               <Chip
+                activo={estadoFiltro === "pendientes"}
+                onClick={() => cambiarEstado("pendientes")}
+                contador={pendientes}
+              >
+                Pendientes
+              </Chip>
+              <Chip
                 activo={estadoFiltro === "activos"}
                 onClick={() => cambiarEstado("activos")}
               >
@@ -705,7 +837,7 @@ export default function AdminUsuarios() {
                 activo={estadoFiltro === "inactivos"}
                 onClick={() => cambiarEstado("inactivos")}
               >
-                Inactivos
+                De baja
               </Chip>
             </Filtro>
             <Filtro etiqueta="Rol">
@@ -767,7 +899,9 @@ export default function AdminUsuarios() {
               </>
             ) : (
               <p className="text-sm text-stone-500">
-                Todavía no hay usuarios cargados.
+                Todavía no hay usuarios. Los vecinos se registran solos desde la
+                pantalla de inicio de sesión y acá aparecen para que apruebes su
+                acceso.
               </p>
             )}
           </div>
@@ -793,40 +927,24 @@ export default function AdminUsuarios() {
                       {u.nombre} {u.apellido}
                     </p>
                     <p className="truncate text-sm text-stone-500">{u.email}</p>
+                    {u.unidad_declarada && estadoPerfil(u) === "pendiente" && (
+                      <p className="mt-1 text-sm text-stone-600">
+                        Dice vivir en: {u.unidad_declarada}
+                      </p>
+                    )}
                   </Link>
-                  <span
-                    className={
-                      u.activo
-                        ? "shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                        : "shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
-                    }
-                  >
-                    {u.activo ? "Activo" : "Inactivo"}
-                  </span>
+                  <EstadoUsuario perfil={u} />
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
                   <span className="text-xs font-medium text-stone-500">
                     {u.rol === "admin" ? "Administrador" : "Usuario"}
                   </span>
-                  <div className="flex gap-2">
-                    {!u.activo && (
-                      <button
-                        type="button"
-                        onClick={() => empezarEliminacion(u)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleClickEstado(u)}
-                      disabled={accionPendiente === u.id}
-                      className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {u.activo ? "Dar de baja" : "Reactivar"}
-                    </button>
-                  </div>
+                  <AccionesUsuario
+                    usuario={u}
+                    ocupado={accionPendiente === u.id}
+                    onCambiarEstado={handleClickEstado}
+                    onEliminar={empezarEliminacion}
+                  />
                 </div>
               </div>
             ))}
@@ -859,41 +977,28 @@ export default function AdminUsuarios() {
                           {u.nombre} {u.apellido}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-stone-600">{u.email}</td>
+                      <td className="px-4 py-3 text-stone-600">
+                        {u.email}
+                        {u.unidad_declarada &&
+                          estadoPerfil(u) === "pendiente" && (
+                            <span className="mt-0.5 block text-xs text-stone-500">
+                              Dice vivir en: {u.unidad_declarada}
+                            </span>
+                          )}
+                      </td>
                       <td className="px-4 py-3 text-stone-600">
                         {u.rol === "admin" ? "Administrador" : "Usuario"}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={
-                            u.activo
-                              ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                              : "rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
-                          }
-                        >
-                          {u.activo ? "Activo" : "Inactivo"}
-                        </span>
+                        <EstadoUsuario perfil={u} />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleClickEstado(u)}
-                            disabled={accionPendiente === u.id}
-                            className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {u.activo ? "Dar de baja" : "Reactivar"}
-                          </button>
-                          {!u.activo && (
-                            <button
-                              type="button"
-                              onClick={() => empezarEliminacion(u)}
-                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
+                        <AccionesUsuario
+                          usuario={u}
+                          ocupado={accionPendiente === u.id}
+                          onCambiarEstado={handleClickEstado}
+                          onEliminar={empezarEliminacion}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -931,12 +1036,21 @@ export default function AdminUsuarios() {
         open={!!aEliminar}
         onClose={cerrarEliminacion}
         busy={eliminando}
-        title="Eliminar usuario"
-        description="Un usuario inactivo se puede eliminar definitivamente."
+        title={
+          aEliminar && estadoPerfil(aEliminar) === "pendiente"
+            ? "Rechazar solicitud"
+            : "Eliminar usuario"
+        }
+        description={
+          aEliminar && estadoPerfil(aEliminar) === "pendiente"
+            ? "Se elimina la cuenta de quien todavía no fue aprobado."
+            : "Un usuario inactivo se puede eliminar definitivamente."
+        }
       >
         {aEliminar && (
           <EliminarUsuarioForm
             usuario={aEliminar}
+            rechazo={estadoPerfil(aEliminar) === "pendiente"}
             eliminando={eliminando}
             error={eliminarError}
             onCancelar={cerrarEliminacion}

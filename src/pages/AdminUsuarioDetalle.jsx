@@ -4,6 +4,7 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EliminarUsuarioForm from "../components/EliminarUsuarioForm";
+import EstadoUsuario from "../components/EstadoUsuario";
 import ModalForm from "../components/ModalForm";
 import SegmentedControl from "../components/SegmentedControl";
 import { useAuth } from "../contexts/auth-context/use-auth";
@@ -12,6 +13,7 @@ import {
   mensajeDeError,
 } from "../utils/supabase-errors";
 import { asignacionVigente, formatearFecha } from "../utils/fechas";
+import { estadoPerfil } from "../utils/usuarios";
 
 function obtenerPerfil(id) {
   return supabase.from("perfiles").select("*").eq("id", id).single();
@@ -166,6 +168,7 @@ export default function AdminUsuarioDetalle() {
 
   const [accionPendiente, setAccionPendiente] = useState(false);
   const [accionError, setAccionError] = useState(null);
+  const [recienAprobado, setRecienAprobado] = useState(false);
   const [confirmandoBaja, setConfirmandoBaja] = useState(false);
 
   const [eliminandoAbierto, setEliminandoAbierto] = useState(false);
@@ -224,8 +227,10 @@ export default function AdminUsuarioDetalle() {
   }
 
   async function handleCambiarEstado(activar) {
+    const eraPendiente = estadoPerfil(perfil) === "pendiente";
     setAccionPendiente(true);
     setAccionError(null);
+    setRecienAprobado(false);
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: { action: activar ? "reactivate" : "deactivate", userId: id },
     });
@@ -241,7 +246,13 @@ export default function AdminUsuarioDetalle() {
       );
       return;
     }
-    setPerfil((p) => ({ ...p, activo: activar }));
+    const ahora = new Date().toISOString();
+    setPerfil((p) => ({
+      ...p,
+      activo: activar,
+      aprobado_en: activar ? (p.aprobado_en ?? ahora) : p.aprobado_en,
+    }));
+    setRecienAprobado(activar && eraPendiente);
   }
 
   function handleClickEstado() {
@@ -352,20 +363,47 @@ export default function AdminUsuarioDetalle() {
                   >
                     {perfil.rol === "admin" ? "Administrador" : "Usuario"}
                   </span>
-                  <span
-                    className={
-                      perfil.activo
-                        ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                        : "rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
-                    }
-                  >
-                    {perfil.activo ? "Activo" : "Inactivo"}
-                  </span>
+                  <EstadoUsuario perfil={perfil} />
                 </div>
               </div>
               <p className="mt-3 text-xs text-stone-400">
-                Alta: {new Date(perfil.created_at).toLocaleDateString("es-AR")}
+                {estadoPerfil(perfil) === "pendiente" ? "Solicitud" : "Alta"}:{" "}
+                {new Date(perfil.created_at).toLocaleDateString("es-AR")}
               </p>
+
+              {estadoPerfil(perfil) === "pendiente" && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  <p className="font-semibold">
+                    Esta persona espera que apruebes su acceso.
+                  </p>
+                  <p className="mt-1">
+                    Verificó su correo, pero todavía no puede ver nada. Al
+                    aprobarla podrá ingresar; para que vea su edificio hay que
+                    asignarle una unidad.
+                  </p>
+                  <p className="mt-2">
+                    <span className="font-medium">Dijo vivir en:</span>{" "}
+                    {perfil.unidad_declarada || "no lo indicó"}
+                    <span className="text-amber-800">
+                      {" "}
+                      (lo escribió la propia persona, sin verificar)
+                    </span>
+                  </p>
+                </div>
+              )}
+
+              {recienAprobado && (
+                <div
+                  role="status"
+                  className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-900"
+                >
+                  <p className="font-semibold">Cuenta aprobada.</p>
+                  <p className="mt-1">
+                    Ya puede ingresar. Asignale su unidad desde el edificio para
+                    que vea la información que le corresponde.
+                  </p>
+                </div>
+              )}
 
               {esMiCuenta ? (
                 <p className="mt-4 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">
@@ -378,9 +416,17 @@ export default function AdminUsuarioDetalle() {
                     type="button"
                     onClick={handleClickEstado}
                     disabled={accionPendiente}
-                    className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={
+                      estadoPerfil(perfil) === "pendiente"
+                        ? "rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
+                        : "rounded-lg border border-stone-300 px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    }
                   >
-                    {perfil.activo ? "Dar de baja" : "Reactivar"}
+                    {estadoPerfil(perfil) === "activo"
+                      ? "Dar de baja"
+                      : estadoPerfil(perfil) === "pendiente"
+                        ? "Aprobar acceso"
+                        : "Reactivar"}
                   </button>
                   {!perfil.activo && (
                     <button
@@ -392,7 +438,9 @@ export default function AdminUsuarioDetalle() {
                       disabled={accionPendiente}
                       className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Eliminar
+                      {estadoPerfil(perfil) === "pendiente"
+                        ? "Rechazar solicitud"
+                        : "Eliminar"}
                     </button>
                   )}
                 </div>
@@ -579,12 +627,21 @@ export default function AdminUsuarioDetalle() {
         open={eliminandoAbierto}
         onClose={cerrarEliminacion}
         busy={eliminando}
-        title="Eliminar usuario"
-        description="Un usuario inactivo se puede eliminar definitivamente."
+        title={
+          perfil && estadoPerfil(perfil) === "pendiente"
+            ? "Rechazar solicitud"
+            : "Eliminar usuario"
+        }
+        description={
+          perfil && estadoPerfil(perfil) === "pendiente"
+            ? "Se elimina la cuenta de quien todavía no fue aprobado."
+            : "Un usuario inactivo se puede eliminar definitivamente."
+        }
       >
         {perfil && (
           <EliminarUsuarioForm
             usuario={perfil}
+            rechazo={estadoPerfil(perfil) === "pendiente"}
             eliminando={eliminando}
             error={eliminarError}
             onCancelar={cerrarEliminacion}

@@ -1,35 +1,78 @@
+import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
-import { useLocation } from "wouter";
-import { useActionState } from "react";
+import { useEnfriamiento } from "../hooks/useEnfriamiento";
+import { reenviarVerificacion } from "../services/cuenta";
 import AuthLayout from "./AuthLayout";
+import {
+  Alerta,
+  BotonPrincipal,
+  BotonSecundario,
+  CampoContrasena,
+  CampoTexto,
+} from "./CamposAuth";
 
 export default function Singin() {
   const { singInUser } = useAuth();
   const [, navigate] = useLocation();
-  const [error, submitAction, isPending] = useActionState(
-    async (previusState, formData) => {
-      const email = formData.get("email");
-      const password = formData.get("password");
-      const {
-        success,
-        data,
-        error: singInError,
-      } = await singInUser(email, password);
 
-      if (singInError) return new Error(singInError);
-      if (success && data?.session) {
-        navigate("/home");
-        return null;
-      }
-      return null;
-    },
-    null,
-  );
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState(null);
+  // Cuenta creada pero con el correo sin verificar: se ofrece reenviar el mail.
+  const [sinVerificar, setSinVerificar] = useState(false);
+  const [reenvio, setReenvio] = useState(null);
+  const [reenviando, setReenviando] = useState(false);
+  const [restante, iniciarEnfriamiento] = useEnfriamiento(60);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (enviando) return;
+    setEnviando(true);
+    setError(null);
+    setReenvio(null);
+    setSinVerificar(false);
+
+    const {
+      success,
+      data,
+      error: singInError,
+      codigo,
+    } = await singInUser(email, password);
+    setEnviando(false);
+
+    if (singInError) {
+      setError(singInError);
+      setSinVerificar(codigo === "email_not_confirmed");
+      // La contraseña mal escrita se borra; el correo queda para corregirla.
+      setPassword("");
+      return;
+    }
+    if (success && data?.session) navigate("/home");
+  }
+
+  async function handleReenviar() {
+    setReenviando(true);
+    setReenvio(null);
+    const resultado = await reenviarVerificacion(email);
+    setReenviando(false);
+    if (resultado.ok) {
+      iniciarEnfriamiento();
+      setReenvio({
+        tipo: "exito",
+        texto:
+          "Te mandamos otro correo de verificación. Revisá también la carpeta de spam.",
+      });
+    } else {
+      setReenvio({ tipo: "error", texto: resultado.error });
+    }
+  }
 
   return (
     <AuthLayout>
       <form
-        action={submitAction}
+        onSubmit={handleSubmit}
         aria-label="Formulario de inicio de sesión"
         aria-describedby="form-description"
         className="space-y-4"
@@ -43,67 +86,76 @@ export default function Singin() {
           </p>
         </div>
 
-        <div>
-          <label
-            htmlFor="email"
-            className="mb-1 block text-sm font-medium text-stone-700"
-          >
-            Correo electrónico
-          </label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            autoComplete="email"
-            required
-            aria-required="true"
-            aria-invalid={error ? "true" : "false"}
-            aria-describedby={error ? "singin-error" : undefined}
-            disabled={isPending}
-            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400"
-          />
-        </div>
+        <CampoTexto
+          id="email"
+          label="Correo electrónico"
+          type="email"
+          autoComplete="email"
+          inputMode="email"
+          autoCapitalize="off"
+          spellCheck={false}
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={enviando}
+          invalido={!!error}
+        />
 
         <div>
-          <label
-            htmlFor="password"
-            className="mb-1 block text-sm font-medium text-stone-700"
-          >
-            Contraseña
-          </label>
-          <input
-            type="password"
-            name="password"
+          <CampoContrasena
             id="password"
+            label="Contraseña"
             autoComplete="current-password"
             required
-            aria-required="true"
-            aria-invalid={error ? "true" : "false"}
-            aria-describedby={error ? "singin-error" : undefined}
-            disabled={isPending}
-            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={enviando}
+            invalido={!!error}
           />
+          <p className="mt-1.5 text-right text-sm">
+            <Link
+              href="/olvide-contrasena"
+              className="font-medium text-brand-700 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
         </div>
 
-        <button
-          type="submit"
-          aria-busy={isPending}
-          disabled={isPending}
-          className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-base font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
-        >
-          {isPending ? "Iniciando sesión..." : "Iniciar sesión"}
-        </button>
+        <BotonPrincipal
+          cargando={enviando}
+          etiqueta="Iniciar sesión"
+          etiquetaCargando="Iniciando sesión..."
+        />
 
-        {error && (
-          <div
-            id="singin-error"
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            {error.message}
+        {error && <Alerta id="singin-error">{error}</Alerta>}
+
+        {sinVerificar && (
+          <div className="space-y-2">
+            <BotonSecundario
+              onClick={handleReenviar}
+              disabled={reenviando || restante > 0 || !email.trim()}
+            >
+              {reenviando
+                ? "Enviando..."
+                : restante > 0
+                  ? `Reenviar correo (${restante} s)`
+                  : "Reenviar correo de verificación"}
+            </BotonSecundario>
+            {reenvio && <Alerta tipo={reenvio.tipo}>{reenvio.texto}</Alerta>}
           </div>
         )}
       </form>
+
+      <div className="mt-6 border-t border-stone-200 pt-5 text-center text-sm text-stone-600">
+        ¿Primera vez en la plataforma?{" "}
+        <Link
+          href="/crear-cuenta"
+          className="font-semibold text-brand-700 hover:text-brand-800 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+        >
+          Creá tu cuenta
+        </Link>
+      </div>
     </AuthLayout>
   );
 }

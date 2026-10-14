@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elegí una contraseña nueva</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f6f7f8;">
+    <!-- Texto que se ve en la vista previa de la bandeja de entrada -->
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      Usá este enlace para elegir una contraseña nueva en SMPH.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f6f7f8;">
+      <tr>
+        <td align="center" style="padding:24px 12px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;background-color:#ffffff;border:1px solid #e3e6ea;border-radius:16px;overflow:hidden;">
+            <!-- franja con los tres colores de la marca -->
+            <tr>
+              <td style="font-size:0;line-height:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td width="34%" height="4" style="background-color:#a5031c;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="33%" height="4" style="background-color:#ed8012;font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="33%" height="4" style="background-color:#2c323a;font-size:0;line-height:0;">&nbsp;</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 28px 8px 28px;font-family:Arial,Helvetica,sans-serif;color:#2c323a;">
+                <img src="{{ .SiteURL }}/icon-192.png" width="48" height="48" alt="SMPH" style="display:block;border:0;border-radius:50%;margin-bottom:16px;" />
+                <h1 style="margin:0 0 12px 0;font-size:22px;line-height:28px;color:#2c323a;">Elegí una contraseña nueva</h1>
+                <p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#4a525c;">
+                  Recibimos un pedido para cambiar la contraseña de la cuenta
+                  <strong>{{ .Email }}</strong> en
+                  <strong>Supervisión y Mantenimiento Propiedad Horizontal</strong>.
+                </p>
+                <p style="margin:0 0 24px 0;font-size:15px;line-height:22px;color:#4a525c;">
+                  Tocá el botón para elegir una contraseña nueva. El enlace
+                  vale por tiempo limitado y se puede usar una sola vez.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:0 28px 24px 28px;">
+                <a
+                  href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery"
+                  style="display:inline-block;background-color:#a5031c;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;line-height:20px;text-decoration:none;padding:14px 28px;border-radius:10px;"
+                  >Elegir contraseña nueva</a
+                >
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 28px 28px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#656e79;">
+                <p style="margin:0 0 10px 0;">
+                  Si el botón no funciona, copiá y pegá este enlace en tu navegador:<br />
+                  <a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery" style="color:#a5031c;word-break:break-all;">{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery</a>
+                </p>
+                <p style="margin:0;">
+                  Si no pediste este cambio, ignorá este mensaje: tu contraseña
+                  actual sigue siendo la misma. Por seguridad, nunca te
+                  pediremos tu contraseña por correo.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#8a929c;">
+            SMPH · Supervisión y Mantenimiento Propiedad Horizontal
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -18,6 +18,8 @@ export default function EliminarUsuarioForm({
   error,
   onCancelar,
   onConfirmar,
+  // true cuando la persona todavía no fue aprobada: se rechaza su solicitud.
+  rechazo = false,
 }) {
   const [paso, setPaso] = useState(1);
   const [escrito, setEscrito] = useState("");
@@ -32,26 +34,40 @@ export default function EliminarUsuarioForm({
       <div className="space-y-4">
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
           <p className="font-semibold">
-            Vas a eliminar a {nombre || usuario.email}.
+            {rechazo
+              ? `Vas a rechazar la solicitud de ${nombre || usuario.email}.`
+              : `Vas a eliminar a ${nombre || usuario.email}.`}
           </p>
           <p className="mt-0.5 break-all text-red-800">{usuario.email}</p>
           <p className="mt-3 font-semibold">Esto no se puede deshacer.</p>
-          <ul className="mt-1.5 list-disc space-y-1 pl-5">
-            <li>
-              Se borran sus datos personales (nombre, email y acceso) y{" "}
-              <strong>no se pueden recuperar</strong>.
-            </li>
-            <li>Se quitan sus asignaciones a unidades.</li>
-            <li>
-              Sus reclamos, comentarios y anuncios se conservan, pero dejan de
-              mostrar su nombre.
-            </li>
-          </ul>
+          {rechazo ? (
+            <ul className="mt-1.5 list-disc space-y-1 pl-5">
+              <li>Se borra la cuenta y sus datos (nombre, email y acceso).</li>
+              <li>
+                La persona <strong>no recibe ningún aviso</strong>. Si quiere,
+                puede volver a registrarse.
+              </li>
+            </ul>
+          ) : (
+            <ul className="mt-1.5 list-disc space-y-1 pl-5">
+              <li>
+                Se borran sus datos personales (nombre, email y acceso) y{" "}
+                <strong>no se pueden recuperar</strong>.
+              </li>
+              <li>Se quitan sus asignaciones a unidades.</li>
+              <li>
+                Sus reclamos, comentarios y anuncios se conservan, pero dejan de
+                mostrar su nombre.
+              </li>
+            </ul>
+          )}
         </div>
-        <p className="text-sm text-stone-600">
-          Si solo querés que no pueda ingresar, dejalo inactivo: eso se puede
-          revertir cuando quieras.
-        </p>
+        {!rechazo && (
+          <p className="text-sm text-stone-600">
+            Si solo querés que no pueda ingresar, dejalo inactivo: eso se puede
+            revertir cuando quieras.
+          </p>
+        )}
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -132,7 +148,13 @@ export default function EliminarUsuarioForm({
           disabled={!coincide || eliminando}
           className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500"
         >
-          {eliminando ? "Eliminando..." : "Eliminar definitivamente"}
+          {eliminando
+            ? rechazo
+              ? "Rechazando..."
+              : "Eliminando..."
+            : rechazo
+              ? "Rechazar y eliminar"
+              : "Eliminar definitivamente"}
         </button>
       </div>
     </form>

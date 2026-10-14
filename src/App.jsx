@@ -5,6 +5,9 @@ import Singin from "./components/singin";
 import Home from "./pages/home";
 import { AuthContextProvider } from "./contexts/auth-context/AuthContext";
 import { useAuth } from "./contexts/auth-context/use-auth";
+import CuentaNoActiva, {
+  PerfilNoDisponible,
+} from "./components/CuentaNoActiva";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoadingScreen from "./components/LoadingScreen";
 
@@ -50,6 +53,12 @@ const AdminEdificios = pantalla(() => import("./pages/AdminEdificios"));
 const AdminEdificioDetalle = pantalla(
   () => import("./pages/AdminEdificioDetalle"),
 );
+const CrearCuenta = pantalla(() => import("./pages/CrearCuenta"));
+const ConfirmarCuenta = pantalla(() => import("./pages/ConfirmarCuenta"));
+const OlvideContrasena = pantalla(() => import("./pages/OlvideContrasena"));
+const RestablecerContrasena = pantalla(
+  () => import("./pages/RestablecerContrasena"),
+);
 
 function PublicRoute({ component: Component }) {
   const { session } = useAuth();
@@ -58,19 +67,31 @@ function PublicRoute({ component: Component }) {
   return <Component />;
 }
 
+// Quien tiene sesión pero no tiene la cuenta activa (todavía no la aprobó la
+// administración, o la dieron de baja) no ve la app: solo una pantalla de
+// estado. Esto es solo la cara visible; lo que protege los datos son las
+// políticas de la base (RLS), que también cierran el acceso a cuentas inactivas.
+function conPerfilActivo(perfil, Component) {
+  if (perfil === null) return <PerfilNoDisponible />;
+  if (perfil.activo === false) return <CuentaNoActiva />;
+  return <Component />;
+}
+
 function ProtectedRoute({ component: Component }) {
-  const { session } = useAuth();
+  const { session, perfil } = useAuth();
   if (session === undefined) return <LoadingScreen />;
   if (!session) return <Redirect to="/" />;
-  return <Component />;
+  if (perfil === undefined) return <LoadingScreen />;
+  return conPerfilActivo(perfil, Component);
 }
 
 function AdminRoute({ component: Component }) {
   const { session, perfil } = useAuth();
   if (session === undefined || perfil === undefined) return <LoadingScreen />;
   if (!session) return <Redirect to="/" />;
-  if (perfil?.rol !== "admin") return <Redirect to="/home" />;
-  return <Component />;
+  if (perfil === null) return <PerfilNoDisponible />;
+  if (perfil.rol !== "admin") return <Redirect to="/home" />;
+  return conPerfilActivo(perfil, Component);
 }
 
 function AppRoutes() {
@@ -79,6 +100,15 @@ function AppRoutes() {
       <Route path="/">
         <PublicRoute component={Singin} />
       </Route>
+      <Route path="/crear-cuenta">
+        <PublicRoute component={CrearCuenta} />
+      </Route>
+      <Route path="/olvide-contrasena">
+        <PublicRoute component={OlvideContrasena} />
+      </Route>
+      {/* Destinos de los enlaces de los correos: se abren con o sin sesión. */}
+      <Route path="/confirmar" component={ConfirmarCuenta} />
+      <Route path="/restablecer" component={RestablecerContrasena} />
       <Route path="/home">
         <ProtectedRoute component={Home} />
       </Route>

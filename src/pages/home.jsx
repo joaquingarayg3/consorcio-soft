@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
+import { useSolicitudesPendientes } from "../hooks/useSolicitudesPendientes";
 import AppHeader from "../components/AppHeader";
 import InicioVecino from "../components/InicioVecino";
 import { Isotipo, PieMarca } from "../components/Marca";
@@ -51,7 +52,7 @@ const accesos = [
   {
     href: "/admin/usuarios",
     titulo: "Usuarios",
-    descripcion: "Altas, bajas y perfiles",
+    descripcion: "Solicitudes, altas y perfiles",
     imagen: imagenUsuarios,
     icono: (
       <svg
@@ -124,11 +125,16 @@ function AccesoCard({ acceso }) {
       >
         <div className="min-w-0 flex-1 text-left">
           <p
-            className={`font-semibold text-stone-900 ${
+            className={`flex flex-wrap items-center gap-2 font-semibold text-stone-900 ${
               conImagen ? "lg:text-lg" : ""
             }`}
           >
             {acceso.titulo}
+            {acceso.insignia && (
+              <span className="rounded-full bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">
+                {acceso.insignia}
+              </span>
+            )}
           </p>
           <p
             className={`truncate text-sm text-stone-500 ${
@@ -158,6 +164,7 @@ function AccesoCard({ acceso }) {
 export default function Home() {
   const { session, perfil } = useAuth();
   const email = session?.user?.email;
+  const pendientes = useSolicitudesPendientes(perfil?.rol === "admin");
 
   return (
     <div className="min-h-dvh bg-stone-50">
@@ -185,7 +192,20 @@ export default function Home() {
               </h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3 lg:gap-6 xl:gap-8">
                 {accesos.map((a) => (
-                  <AccesoCard key={a.href} acceso={a} />
+                  <AccesoCard
+                    key={a.href}
+                    acceso={
+                      a.href === "/admin/usuarios" && pendientes > 0
+                        ? {
+                            ...a,
+                            insignia:
+                              pendientes === 1
+                                ? "1 solicitud"
+                                : `${pendientes} solicitudes`,
+                          }
+                        : a
+                    }
+                  />
                 ))}
               </div>
             </div>
