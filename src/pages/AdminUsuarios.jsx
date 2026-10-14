@@ -4,8 +4,14 @@ import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ConfirmDialog from "../components/ConfirmDialog";
 import EliminarUsuarioForm from "../components/EliminarUsuarioForm";
+import EstadoUsuario from "../components/EstadoUsuario";
 import ModalForm, { ModalFormButton } from "../components/ModalForm";
-import { buscarPerfiles, USUARIOS_POR_PAGINA } from "../services/usuarios";
+import {
+  buscarPerfiles,
+  contarPendientes,
+  USUARIOS_POR_PAGINA,
+} from "../services/usuarios";
+import { estadoPerfil } from "../utils/usuarios";
 import {
   getAdminFunctionErrorMessage,
   mensajeDeError,
@@ -24,15 +30,15 @@ function leerBusquedaGuardada() {
 function Filtro({ etiqueta, children }) {
   return (
     <div role="group" aria-label={etiqueta}>
-      <p className="mb-1.5 px-1 text-xs font-medium tracking-wide text-stone-500 uppercase">
+      <p className="mb-1.5 px-1 text-center text-xs font-medium tracking-wide text-stone-500 uppercase">
         {etiqueta}
       </p>
-      <div className="flex flex-wrap gap-2">{children}</div>
+      <div className="flex flex-wrap justify-center gap-2">{children}</div>
     </div>
   );
 }
 
-function Chip({ activo, onClick, children }) {
+function Chip({ activo, onClick, contador, children }) {
   return (
     <button
       type="button"
@@ -45,7 +51,179 @@ function Chip({ activo, onClick, children }) {
       }`}
     >
       {children}
+      {contador > 0 && (
+        <span className="ml-1.5 inline-block min-w-5 rounded-full bg-brand-700 px-1.5 text-center text-xs font-semibold text-white">
+          {contador}
+        </span>
+      )}
     </button>
+  );
+}
+
+// Botones de una fila de la lista, según el estado de la cuenta:
+//   pendiente → Aprobar / Rechazar     activo → Dar de baja
+//   de baja   → Reactivar / Eliminar
+function AccionesUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
+  const estado = estadoPerfil(usuario);
+  // pointer-events-auto: la fila entera es un enlace y sus botones tienen que
+  // recibir el toque ellos mismos, no el enlace que está detrás.
+  const secundario =
+    "pointer-events-auto rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50";
+  const peligro =
+    "pointer-events-auto rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+  return (
+    <div className="flex gap-2">
+      {estado !== "activo" && (
+        <button
+          type="button"
+          onClick={() => onEliminar(usuario)}
+          disabled={ocupado}
+          className={peligro}
+        >
+          {estado === "pendiente" ? "Rechazar" : "Eliminar"}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => onCambiarEstado(usuario)}
+        disabled={ocupado}
+        className={
+          estado === "pendiente"
+            ? "pointer-events-auto rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
+            : secundario
+        }
+      >
+        {estado === "activo"
+          ? "Dar de baja"
+          : estado === "pendiente"
+            ? "Aprobar"
+            : "Reactivar"}
+      </button>
+    </div>
+  );
+}
+
+// Las columnas de escritorio se comparten entre el encabezado y las filas.
+const COLUMNAS =
+  "lg:grid-cols-[2.75rem_minmax(0,1fr)_8rem_6.5rem_13rem_1.25rem]";
+
+const inicial = (texto) =>
+  String(texto ?? "")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+
+function FilasCargando() {
+  return (
+    <ul aria-hidden="true" className="divide-y divide-stone-100">
+      {[0, 1, 2, 3, 4].map((n) => (
+        <li key={n} className="flex items-center gap-4 px-4 py-3.5 lg:px-5">
+          <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-stone-100 motion-reduce:animate-none" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-1/3 animate-pulse rounded bg-stone-100 motion-reduce:animate-none" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-stone-100 motion-reduce:animate-none" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const flecha = (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600"
+  >
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+);
+
+// Toda la fila lleva al perfil. El enlace del nombre se extiende sobre la fila
+// entera (el ::after) y los botones de acción quedan por encima, así no hay
+// botones dentro de un enlace y el teclado y los lectores de pantalla ven un
+// único enlace por persona.
+function FilaUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
+  const nombreCompleto =
+    `${usuario.nombre ?? ""} ${usuario.apellido ?? ""}`.trim() || "Sin nombre";
+  const rol = usuario.rol === "admin" ? "Administrador" : "Usuario";
+
+  return (
+    <li className="group relative transition-colors hover:bg-amber-50/70 has-[a:focus-visible]:bg-amber-50/70 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-brand-600/50 has-[a:focus-visible]:ring-inset">
+      <div
+        className={`px-4 py-3.5 lg:grid lg:items-center lg:gap-4 lg:px-5 ${COLUMNAS}`}
+      >
+        <div className="flex items-center gap-3 lg:contents">
+          <div
+            aria-hidden="true"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+              usuario.rol === "admin"
+                ? "bg-brand-700 text-white"
+                : "bg-amber-100 text-amber-800"
+            }`}
+          >
+            {inicial(usuario.nombre)}
+            {inicial(usuario.apellido)}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/admin/usuarios/${usuario.id}`}
+              className="block truncate font-semibold text-stone-900 outline-none after:absolute after:inset-0 after:content-['']"
+            >
+              {nombreCompleto}
+            </Link>
+            <p className="truncate text-sm text-stone-500">{usuario.email}</p>
+            {usuario.unidad_declarada &&
+              estadoPerfil(usuario) === "pendiente" && (
+                <p className="mt-0.5 truncate text-xs text-stone-600">
+                  Dice vivir en: {usuario.unidad_declarada}
+                </p>
+              )}
+          </div>
+
+          <EstadoUsuario perfil={usuario} className="lg:hidden" />
+          <span className="lg:hidden">{flecha}</span>
+        </div>
+
+        <span
+          className={`hidden text-sm lg:block ${
+            usuario.rol === "admin"
+              ? "font-medium text-brand-700"
+              : "text-stone-600"
+          }`}
+        >
+          {rol}
+        </span>
+        <span className="hidden lg:block">
+          <EstadoUsuario perfil={usuario} />
+        </span>
+
+        <div className="pointer-events-none relative z-10 mt-3 flex items-center justify-between gap-2 border-t border-stone-100 pt-3 lg:mt-0 lg:justify-end lg:border-0 lg:pt-0">
+          <span
+            className={`text-xs font-medium lg:hidden ${
+              usuario.rol === "admin" ? "text-brand-700" : "text-stone-500"
+            }`}
+          >
+            {rol}
+          </span>
+          <AccionesUsuario
+            usuario={usuario}
+            ocupado={ocupado}
+            onCambiarEstado={onCambiarEstado}
+            onEliminar={onEliminar}
+          />
+        </div>
+
+        <span className="hidden lg:block">{flecha}</span>
+      </div>
+    </li>
   );
 }
 
@@ -93,6 +271,8 @@ export default function AdminUsuarios() {
 
   const [accionPendiente, setAccionPendiente] = useState(null);
   const [confirmandoBaja, setConfirmandoBaja] = useState(null);
+  const [pendientes, setPendientes] = useState(null);
+  const [personaAprobada, setPersonaAprobada] = useState(null);
 
   const [aEliminar, setAEliminar] = useState(null);
   const [eliminando, setEliminando] = useState(false);
@@ -142,6 +322,19 @@ export default function AdminUsuarios() {
 
     cargarUnidades();
   }, [edificioId]);
+
+  // Cuántas solicitudes esperan aprobación: se vuelve a contar tras cada cambio.
+  useEffect(() => {
+    let vigente = true;
+    contarPendientes()
+      .then((cantidad) => {
+        if (vigente) setPendientes(cantidad);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [recarga]);
 
   const textoBuscado = busqueda.trim();
   // Identifica la consulta en curso: mientras el resultado guardado no sea el de
@@ -285,6 +478,7 @@ export default function AdminUsuarios() {
 
   async function handleCambiarEstado(usuario, activar) {
     setAccionPendiente(usuario.id);
+    setPersonaAprobada(null);
     const { data, error } = await supabase.functions.invoke("admin-users", {
       body: {
         action: activar ? "reactivate" : "deactivate",
@@ -302,6 +496,12 @@ export default function AdminUsuarios() {
         ),
       );
       return;
+    }
+    if (activar && estadoPerfil(usuario) === "pendiente") {
+      setPersonaAprobada(
+        `${usuario.nombre ?? ""} ${usuario.apellido ?? ""}`.trim() ||
+          usuario.email,
+      );
     }
     recargar();
   }
@@ -378,9 +578,59 @@ export default function AdminUsuarios() {
             }}
             className="w-full rounded-lg bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 sm:w-auto sm:py-2"
           >
-            + Nuevo usuario
+            + Crear usuario manualmente
           </button>
         </div>
+
+        {personaAprobada && (
+          <div
+            role="status"
+            className="mt-4 flex items-start justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900"
+          >
+            <p>
+              <span className="font-medium">{personaAprobada}</span> ya puede
+              ingresar. Para que vea algo, asignale su unidad desde el edificio
+              correspondiente.{" "}
+              <Link
+                href="/admin/edificios"
+                className="font-semibold text-green-800 underline hover:text-green-900"
+              >
+                Ir a Edificios
+              </Link>
+            </p>
+            <button
+              type="button"
+              onClick={() => setPersonaAprobada(null)}
+              aria-label="Cerrar aviso"
+              className="-my-1 shrink-0 rounded px-1.5 text-lg leading-none text-green-700 hover:bg-green-100"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {pendientes > 0 && estadoFiltro !== "pendientes" && (
+          <div
+            role="status"
+            className="mt-4 flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p>
+              <span className="font-semibold">
+                {pendientes === 1
+                  ? "1 persona espera"
+                  : `${pendientes} personas esperan`}
+              </span>{" "}
+              que apruebes su acceso.
+            </p>
+            <button
+              type="button"
+              onClick={() => cambiarEstado("pendientes")}
+              className="shrink-0 rounded-lg bg-amber-500 px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
+            >
+              Ver solicitudes
+            </button>
+          </div>
+        )}
 
         {usuarioEliminado && (
           <div
@@ -427,7 +677,7 @@ export default function AdminUsuarios() {
           }}
           busy={creando}
           title="Nuevo usuario"
-          description="Completá los datos para dar de alta a la persona."
+          description="Para cuentas que crea la administración (por ejemplo, otro administrador). Los vecinos se registran solos y acá solo se aprueban."
         >
           <form onSubmit={handleCrearUsuario} className="space-y-4">
             <div className="flex gap-3">
@@ -687,13 +937,20 @@ export default function AdminUsuarios() {
               </button>
             )}
           </div>
-          <div className="flex flex-col gap-4 sm:flex-row sm:gap-10">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <Filtro etiqueta="Estado">
               <Chip
                 activo={estadoFiltro === "todos"}
                 onClick={() => cambiarEstado("todos")}
               >
                 Todos
+              </Chip>
+              <Chip
+                activo={estadoFiltro === "pendientes"}
+                onClick={() => cambiarEstado("pendientes")}
+                contador={pendientes}
+              >
+                Pendientes
               </Chip>
               <Chip
                 activo={estadoFiltro === "activos"}
@@ -705,7 +962,7 @@ export default function AdminUsuarios() {
                 activo={estadoFiltro === "inactivos"}
                 onClick={() => cambiarEstado("inactivos")}
               >
-                Inactivos
+                De baja
               </Chip>
             </Filtro>
             <Filtro etiqueta="Rol">
@@ -741,10 +998,6 @@ export default function AdminUsuarios() {
           </p>
         )}
 
-        {usuarios === null && !listError && (
-          <p className="mt-6 text-sm text-stone-500">Cargando usuarios...</p>
-        )}
-
         {usuarios?.length === 0 && !buscando && (
           <div className="mt-6 rounded-2xl border border-stone-200 bg-white px-4 py-10 text-center shadow-sm">
             {filtrando ? (
@@ -767,7 +1020,9 @@ export default function AdminUsuarios() {
               </>
             ) : (
               <p className="text-sm text-stone-500">
-                Todavía no hay usuarios cargados.
+                Todavía no hay usuarios. Los vecinos se registran solos desde la
+                pantalla de inicio de sesión y acá aparecen para que apruebes su
+                acceso.
               </p>
             )}
           </div>
@@ -777,128 +1032,36 @@ export default function AdminUsuarios() {
           aria-busy={buscando}
           className={`transition-opacity ${buscando && usuarios ? "opacity-60" : ""}`}
         >
-          {/* Mobile: tarjetas apiladas */}
-          <div className="mt-6 space-y-3 sm:hidden">
-            {usuarios?.map((u) => (
-              <div
-                key={u.id}
-                className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={`/admin/usuarios/${u.id}`}
-                    className="min-w-0 flex-1"
-                  >
-                    <p className="truncate font-semibold text-stone-900">
-                      {u.nombre} {u.apellido}
-                    </p>
-                    <p className="truncate text-sm text-stone-500">{u.email}</p>
-                  </Link>
-                  <span
-                    className={
-                      u.activo
-                        ? "shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                        : "shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
-                    }
-                  >
-                    {u.activo ? "Activo" : "Inactivo"}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
-                  <span className="text-xs font-medium text-stone-500">
-                    {u.rol === "admin" ? "Administrador" : "Usuario"}
-                  </span>
-                  <div className="flex gap-2">
-                    {!u.activo && (
-                      <button
-                        type="button"
-                        onClick={() => empezarEliminacion(u)}
-                        className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleClickEstado(u)}
-                      disabled={accionPendiente === u.id}
-                      className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {u.activo ? "Dar de baja" : "Reactivar"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          {usuarios === null && !listError && (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+              <FilasCargando />
+            </div>
+          )}
 
-          {/* sm+: tabla */}
           {usuarios?.length > 0 && (
-            <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm sm:block">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-stone-200 text-stone-500">
-                    <th className="px-4 py-3 font-medium">Nombre</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Rol</th>
-                    <th className="px-4 py-3 font-medium">Estado</th>
-                    <th className="px-4 py-3 font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios?.map((u) => (
-                    <tr
-                      key={u.id}
-                      className="border-b border-stone-100 last:border-0"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/usuarios/${u.id}`}
-                          className="font-medium text-stone-900 hover:text-brand-700 hover:underline"
-                        >
-                          {u.nombre} {u.apellido}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-stone-600">{u.email}</td>
-                      <td className="px-4 py-3 text-stone-600">
-                        {u.rol === "admin" ? "Administrador" : "Usuario"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={
-                            u.activo
-                              ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700"
-                              : "rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-600"
-                          }
-                        >
-                          {u.activo ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleClickEstado(u)}
-                            disabled={accionPendiente === u.id}
-                            className="rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {u.activo ? "Dar de baja" : "Reactivar"}
-                          </button>
-                          {!u.activo && (
-                            <button
-                              type="button"
-                              onClick={() => empezarEliminacion(u)}
-                              className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                              Eliminar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+              <div
+                aria-hidden="true"
+                className={`hidden border-b border-stone-200 bg-stone-50 px-5 py-2.5 text-xs font-medium tracking-wide text-stone-500 uppercase lg:grid lg:gap-4 ${COLUMNAS}`}
+              >
+                <span />
+                <span>Usuario</span>
+                <span>Rol</span>
+                <span>Estado</span>
+                <span className="text-right">Acciones</span>
+                <span />
+              </div>
+              <ul className="divide-y divide-stone-100">
+                {usuarios.map((u) => (
+                  <FilaUsuario
+                    key={u.id}
+                    usuario={u}
+                    ocupado={accionPendiente === u.id}
+                    onCambiarEstado={handleClickEstado}
+                    onEliminar={empezarEliminacion}
+                  />
+                ))}
+              </ul>
             </div>
           )}
         </div>
@@ -931,12 +1094,21 @@ export default function AdminUsuarios() {
         open={!!aEliminar}
         onClose={cerrarEliminacion}
         busy={eliminando}
-        title="Eliminar usuario"
-        description="Un usuario inactivo se puede eliminar definitivamente."
+        title={
+          aEliminar && estadoPerfil(aEliminar) === "pendiente"
+            ? "Rechazar solicitud"
+            : "Eliminar usuario"
+        }
+        description={
+          aEliminar && estadoPerfil(aEliminar) === "pendiente"
+            ? "Se elimina la cuenta de quien todavía no fue aprobado."
+            : "Un usuario inactivo se puede eliminar definitivamente."
+        }
       >
         {aEliminar && (
           <EliminarUsuarioForm
             usuario={aEliminar}
+            rechazo={estadoPerfil(aEliminar) === "pendiente"}
             eliminando={eliminando}
             error={eliminarError}
             onCancelar={cerrarEliminacion}

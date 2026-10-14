@@ -90,7 +90,20 @@ export async function fetchAsignacionesVigentes(usuarioIds) {
 
 export const USUARIOS_POR_PAGINA = 50;
 
-const CAMPOS_LISTA = "id, nombre, apellido, email, rol, activo, created_at";
+const CAMPOS_LISTA =
+  "id, nombre, apellido, email, rol, activo, created_at, aprobado_en, unidad_declarada";
+
+// Cuántas personas se registraron, verificaron su correo y esperan que la
+// administración apruebe su acceso. Solo lo ve (y lo puede contar) un admin.
+export async function contarPendientes() {
+  const { count, error } = await supabase
+    .from("perfiles")
+    .select("id", { count: "exact", head: true })
+    .eq("activo", false)
+    .is("aprobado_en", null);
+  if (error) throw error;
+  return count ?? 0;
+}
 
 // Listado de la pantalla de usuarios: búsqueda por texto + filtros + las
 // primeras `limite` filas y el total de coincidencias. Usa la función
@@ -128,7 +141,12 @@ export async function buscarPerfiles({
     .from("perfiles")
     .select(CAMPOS_LISTA, { count: "exact" });
   if (estado === "activos") consulta = consulta.eq("activo", true);
-  if (estado === "inactivos") consulta = consulta.eq("activo", false);
+  if (estado === "pendientes") {
+    consulta = consulta.eq("activo", false).is("aprobado_en", null);
+  }
+  if (estado === "inactivos") {
+    consulta = consulta.eq("activo", false).not("aprobado_en", "is", null);
+  }
   if (rol !== "todos") consulta = consulta.eq("rol", rol);
   for (const palabra of palabrasSeguras(texto)) {
     consulta = consulta.or(

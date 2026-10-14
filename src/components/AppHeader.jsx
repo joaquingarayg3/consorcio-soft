@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { FranjaMarca, Isotipo } from "./Marca";
 import { NOMBRE_MARCA, SIGLAS } from "../utils/marca";
@@ -29,6 +29,8 @@ export default function AppHeader({ backTo }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationHistory, setNotificationHistory] = useState([]);
   const [profileOpen, setProfileOpen] = useState(false);
+  const notificationsRef = useRef(null);
+  const profileRef = useRef(null);
   const [allClaims, setAllClaims] = useState([]);
   const [userAssignment, setUserAssignment] = useState(null);
   const ahora = useAhora();
@@ -133,6 +135,33 @@ export default function AppHeader({ backTo }) {
     };
   }, [session?.user?.id]);
 
+  // Con un menú abierto, tocar en cualquier otro lado (o apretar Escape) lo
+  // cierra. Tocar dentro del propio menú o de su botón no lo cierra.
+  useEffect(() => {
+    if (!notificationsOpen && !profileOpen) return;
+
+    function alTocar(evento) {
+      const dentro = [notificationsRef.current, profileRef.current].some(
+        (contenedor) => contenedor?.contains(evento.target),
+      );
+      if (dentro) return;
+      setNotificationsOpen(false);
+      setProfileOpen(false);
+    }
+    function alApretarTecla(evento) {
+      if (evento.key !== "Escape") return;
+      setNotificationsOpen(false);
+      setProfileOpen(false);
+    }
+
+    document.addEventListener("pointerdown", alTocar);
+    document.addEventListener("keydown", alApretarTecla);
+    return () => {
+      document.removeEventListener("pointerdown", alTocar);
+      document.removeEventListener("keydown", alApretarTecla);
+    };
+  }, [notificationsOpen, profileOpen]);
+
   function notificationTitle(claim) {
     return claim.titulo || claim.title || "Nuevo reclamo";
   }
@@ -191,11 +220,15 @@ export default function AppHeader({ backTo }) {
 
   return (
     <header
-      className={`relative grid items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
-        backTo ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"
+      className={`relative grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
+        backTo ? "" : "sm:grid-cols-[1fr_auto]"
       }`}
     >
       <FranjaMarca className="absolute inset-x-0 top-0" />
+      {/* Columnas laterales iguales (1fr) para que la marca quede centrada de
+          verdad aunque a un lado haya una flecha y al otro dos botones. Sin
+          flecha, en pantallas chicas queda un hueco a la izquierda. */}
+      {!backTo && <span aria-hidden="true" className="sm:hidden" />}
       {backTo && (
         <Link
           href={backTo}
@@ -210,7 +243,7 @@ export default function AppHeader({ backTo }) {
               window.history.back();
             }
           }}
-          className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 text-stone-600 transition-colors hover:bg-stone-100 active:bg-stone-200 sm:w-auto"
+          className="flex h-10 shrink-0 items-center justify-center gap-1.5 justify-self-start rounded-lg px-2 text-stone-600 transition-colors hover:bg-stone-100 active:bg-stone-200 sm:w-auto"
         >
           <svg
             aria-hidden="true"
@@ -231,8 +264,8 @@ export default function AppHeader({ backTo }) {
       <Link
         href="/home"
         aria-label={`${NOMBRE_MARCA}: ir al inicio`}
-        className={`flex min-w-0 items-center gap-2.5 rounded-lg py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
-          backTo ? "justify-center" : "justify-start"
+        className={`flex min-w-0 items-center justify-center gap-2.5 rounded-lg py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 ${
+          backTo ? "" : "sm:justify-start"
         }`}
       >
         <Isotipo className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
@@ -249,8 +282,8 @@ export default function AppHeader({ backTo }) {
         </span>
       </Link>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-        <div className="relative">
+      <div className="flex shrink-0 items-center gap-2 justify-self-end sm:gap-3">
+        <div ref={notificationsRef} className="sm:relative">
           <button
             type="button"
             aria-label={`Notificaciones${totalNuevas ? `: ${totalNuevas} nuevas` : ""}`}
@@ -279,7 +312,7 @@ export default function AppHeader({ backTo }) {
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-12 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl">
+            <div className="absolute inset-x-3 top-full z-50 mt-1 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl sm:inset-x-auto sm:right-0 sm:top-12 sm:mt-0 sm:w-[22rem]">
               <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
                 <p className="font-semibold text-stone-900">Notificaciones</p>
                 {totalNuevas > 0 ? (
@@ -455,7 +488,7 @@ export default function AppHeader({ backTo }) {
             </div>
           )}
         </div>
-        <div className="relative">
+        <div ref={profileRef} className="relative">
           <button
             type="button"
             aria-label="Abrir menú de usuario"

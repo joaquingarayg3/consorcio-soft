@@ -126,15 +126,20 @@ Deno.serve(async (req) => {
         return json({ error: error.message }, 400, req);
       }
 
-      if (rol === "admin") {
-        const { error: profileError } = await adminClient
-          .from("perfiles")
-          .update({ rol: "admin" })
-          .eq("id", data.user.id);
-        if (profileError) {
-          await adminClient.auth.admin.deleteUser(data.user.id);
-          return json({ error: "No se pudo configurar el rol" }, 500, req);
-        }
+      // El perfil nace inactivo y sin aprobar (así entran quienes se registran
+      // solos). Esta persona la da de alta la administración: se activa y se
+      // aprueba acá, junto con el rol.
+      const { error: profileError } = await adminClient
+        .from("perfiles")
+        .update({
+          activo: true,
+          aprobado_en: new Date().toISOString(),
+          ...(rol === "admin" ? { rol: "admin" } : {}),
+        })
+        .eq("id", data.user.id);
+      if (profileError) {
+        await adminClient.auth.admin.deleteUser(data.user.id);
+        return json({ error: "No se pudo activar la cuenta" }, 500, req);
       }
 
       if (unidadId) {
@@ -189,6 +194,24 @@ Deno.serve(async (req) => {
         .eq("id", userId);
       if (profileError) {
         return json({ error: "No se pudo actualizar el perfil" }, 500, req);
+      }
+
+      // Aprobar a quien se registró solo es lo mismo que reactivar: además de
+      // activarlo queda registrado que la administración ya lo aprobó (así
+      // deja de figurar como "pendiente" si alguna vez se lo da de baja).
+      if (action === "reactivate") {
+        const { error: aprobadoError } = await adminClient
+          .from("perfiles")
+          .update({ aprobado_en: new Date().toISOString() })
+          .eq("id", userId)
+          .is("aprobado_en", null);
+        if (aprobadoError) {
+          return json(
+            { error: "No se pudo registrar la aprobación" },
+            500,
+            req,
+          );
+        }
       }
 
       return json({ success: true }, 200, req);
