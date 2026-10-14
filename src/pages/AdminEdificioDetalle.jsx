@@ -6,12 +6,14 @@ import ClaimsPanel from "../components/ClaimsPanel";
 import UnidadesTab from "../components/edificio/UnidadesTab";
 import DatosTab from "../components/edificio/DatosTab";
 import AnunciosTab from "../components/edificio/AnunciosTab";
+import ContactosTab from "../components/edificio/ContactosTab";
 import { mensajeDeError } from "../utils/supabase-errors";
 
 const TABS = [
   { key: "reclamos", label: "Reclamos" },
   { key: "unidades", label: "Unidades" },
   { key: "anuncios", label: "Anuncios" },
+  { key: "contactos", label: "Contactos" },
   { key: "datos", label: "Datos" },
 ];
 
@@ -124,6 +126,7 @@ export default function AdminEdificioDetalle() {
               {tab === "reclamos" && <ClaimsPanel edificio={edificio} />}
               {tab === "unidades" && <UnidadesTab edificioId={edificio.id} />}
               {tab === "anuncios" && <AnunciosTab edificio={edificio} />}
+              {tab === "contactos" && <ContactosTab edificio={edificio} />}
               {tab === "datos" && (
                 <DatosTab edificio={edificio} onSaved={setEdificio} />
               )}

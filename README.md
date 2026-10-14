@@ -80,6 +80,7 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20261013120000_inicio_vecino.sql` | Anuncios urgentes (`anuncios.urgente_hasta`), código de cada edificio (`edificio.codigo`, único, ej. `HP`) y número de reclamo por edificio (`reclamos.numero`, asignado por la base; el ticket se muestra `HP-0012`). Numera los reclamos ya existentes por orden de creación y les sugiere un código a los edificios actuales. **Hay que aplicarla antes de usar la versión nueva de la app.** |
 | `20261014120000_foto_edificio.sql` | Foto de cada edificio: columnas `foto_path`, `miniatura_path` y `foto_actualizada_en` en `edificio`, y el bucket privado `edificios` (la ven administradores y vecinos de ese edificio; solo administradores suben o borran). |
 | `20261015120000_registro_vecinos.sql` | Registro autónomo con aprobación: el perfil se crea **al verificar el correo**, siempre como pendiente (`activo = false`, `aprobado_en` vacío) y con rol `user`. Agrega `perfiles.aprobado_en` y `perfiles.unidad_declarada`, reemplaza el trigger anterior que creaba el perfil al registrarse, hace que una cuenta inactiva no vea nada del consorcio aunque tenga unidad (`usuario_en_unidad` / `usuario_en_edificio`), agrega el estado "pendientes" a `buscar_perfiles` y la función de limpieza `purgar_cuentas_sin_verificar`. Los perfiles que ya existían quedan como aprobados. **Requiere volver a desplegar la función `admin-users`** (activa y aprueba a quien crea un admin). |
+| `20261017120000_perfil_y_contactos.sql` | Datos fiscales y bancarios del edificio (`cuit`, `banco`, `titular_cuenta`, `cbu`, `alias_cbu`, con restricciones de formato; los ven los administradores y los vecinos de ese edificio, que es lo que ya permite la política de lectura de `edificio`), ciudad/provincia/código postal pasan a ser opcionales, tabla `edificio_contactos` (nombre y teléfono; los ven los vecinos del edificio y solo los administradores la modifican) y límite de columnas editables en `perfiles` (`nombre`, `apellido`, `telefono` y `rol`: antes la API dejaba modificar cualquier columna que el trigger no protegiera, como `created_at`). |
 | `20261016120000_imagenes_solo_cuentas_activas.sql` | Subir imágenes de reclamos pasa a exigir cuenta activa (crea `private.cuenta_activa()`): con el registro público, una cuenta pendiente ya no puede ocupar almacenamiento. |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
@@ -103,6 +104,15 @@ Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, 
 - Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
 
 `supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.
+
+## Perfil, contactos y datos del consorcio
+
+- **Mi perfil** (`/perfil`, desde el menú del avatar): cada persona edita su nombre, apellido y teléfono, y cambia su contraseña (se cierran sus otras sesiones). El correo no se edita desde la app: es el de acceso, y cambiarlo requiere reverificarlo.
+- **Edificio**: al crearlo se piden nombre, código, dirección y, opcionalmente, CUIT y datos bancarios (banco, titular, CBU de 22 dígitos y alias). El CUIT se valida con su dígito verificador. Ciudad, provincia y código postal se completan, si se quiere, en la pestaña Datos.
+- **Contactos** (pestaña del edificio, solo administración): nombre y teléfono, por ejemplo "Mantenimiento ascensor".
+- **Botón del teléfono** (cabecera, junto a la campanita, solo vecinos con unidad vigente): abre los contactos de cada uno de sus edificios, con enlace para llamar, y los datos del consorcio (CUIT, CBU y alias con botón de copiar).
+
+El CUIT y los datos bancarios los puede leer **cualquier vecino con una unidad vigente en ese edificio** (y los administradores), no se guardan en una tabla aparte. Si algún día se quisiera que fueran solo para administración, habría que moverlos a una tabla con su propia política.
 
 ## Cuentas: registro, verificación y recuperación
 
