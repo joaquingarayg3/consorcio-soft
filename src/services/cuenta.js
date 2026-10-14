@@ -25,12 +25,14 @@ export async function registrarCuenta({
   email,
   unidad,
   contrasena,
+  captchaToken,
 }) {
   try {
     const { error } = await supabase.auth.signUp({
       email: normalizarCorreo(email),
       password: contrasena,
       options: {
+        captchaToken,
         emailRedirectTo: direccion(RUTA_CONFIRMAR),
         data: {
           nombre: nombre.trim(),
@@ -45,12 +47,12 @@ export async function registrarCuenta({
   }
 }
 
-export async function reenviarVerificacion(email) {
+export async function reenviarVerificacion(email, captchaToken) {
   try {
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: normalizarCorreo(email),
-      options: { emailRedirectTo: direccion(RUTA_CONFIRMAR) },
+      options: { captchaToken, emailRedirectTo: direccion(RUTA_CONFIRMAR) },
     });
     return error ? fallo(error) : exito();
   } catch (error) {
@@ -76,11 +78,11 @@ export async function confirmarCorreo(tokenHash) {
 
 // Manda el enlace para elegir una contraseña nueva. Igual que el registro,
 // responde lo mismo exista o no el correo.
-export async function pedirRecuperacion(email) {
+export async function pedirRecuperacion(email, captchaToken) {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(
       normalizarCorreo(email),
-      { redirectTo: direccion(RUTA_RESTABLECER) },
+      { captchaToken, redirectTo: direccion(RUTA_RESTABLECER) },
     );
     return error ? fallo(error) : exito();
   } catch (error) {

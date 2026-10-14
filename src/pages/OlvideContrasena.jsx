@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import AuthLayout from "../components/AuthLayout";
+import Captcha from "../components/Captcha";
 import {
   Alerta,
   BotonPrincipal,
@@ -10,6 +11,7 @@ import {
 } from "../components/CamposAuth";
 import { useEnfriamiento } from "../hooks/useEnfriamiento";
 import { pedirRecuperacion } from "../services/cuenta";
+import { CAPTCHA_ACTIVO, MENSAJE_CAPTCHA_FALTA } from "../utils/captcha";
 import { FORMATO_CORREO, normalizarCorreo } from "../utils/cuenta";
 
 const enlaceClase =
@@ -21,12 +23,20 @@ export default function OlvideContrasena() {
   const [error, setError] = useState(null);
   const [enviadoA, setEnviadoA] = useState(null);
   const [restante, iniciarEnfriamiento] = useEnfriamiento(60);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const captcha = useRef(null);
 
   async function enviar(correo) {
+    if (CAPTCHA_ACTIVO && !captchaToken) {
+      setError(MENSAJE_CAPTCHA_FALTA);
+      return false;
+    }
     setEnviando(true);
     setError(null);
-    const resultado = await pedirRecuperacion(correo);
+    const resultado = await pedirRecuperacion(correo, captchaToken);
     setEnviando(false);
+    // Cada token sirve para un solo intento.
+    captcha.current?.reiniciar();
     if (!resultado.ok) {
       setError(resultado.error);
       return false;
@@ -67,6 +77,7 @@ export default function OlvideContrasena() {
           </div>
 
           <div className="space-y-2">
+            <Captcha ref={captcha} onToken={setCaptchaToken} />
             <BotonSecundario
               onClick={() => enviar(enviadoA)}
               disabled={enviando || restante > 0}
@@ -131,6 +142,8 @@ export default function OlvideContrasena() {
               disabled={enviando}
               invalido={!!error}
             />
+
+            <Captcha ref={captcha} onToken={setCaptchaToken} />
 
             {error && <Alerta id="recuperar-error">{error}</Alerta>}
 

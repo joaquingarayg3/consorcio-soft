@@ -126,8 +126,24 @@ Sin esto, los correos no llegan o los enlaces no funcionan:
 2. **Authentication → URL Configuration**: *Site URL* = el dominio de producción. En *Redirect URLs* agregar (con tu dominio real) `https://TU-DOMINIO/confirmar`, `https://TU-DOMINIO/restablecer` y, para desarrollo, `http://localhost:5173/confirmar` y `http://localhost:5173/restablecer`.
 3. **Authentication → Emails → SMTP Settings**: SMTP propio con Resend (host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = API key de Resend, remitente de tu dominio verificado, por ejemplo `no-responder@tudominio.com`). Con el servicio de correo por defecto de Supabase solo reciben mails los miembros del equipo y hay un límite muy bajo.
 4. **Authentication → Emails → Templates**: pegar el HTML de `supabase/email-templates/` en **Confirm signup** (`confirmar-cuenta.html`, asunto sugerido "Verificá tu correo — SMPH") y **Reset password** (`restablecer-contrasena.html`, asunto "Elegí una contraseña nueva — SMPH"). Los enlaces usan `{{ .RedirectTo }}`, que la app envía al pedir el correo. No agregues datos que escribe el usuario (como su nombre) a las plantillas: sería posible inyectar texto en un correo que sale de tu dominio.
-5. **Authentication → Rate Limits**: revisar el límite de correos por hora y de registros por IP. Para frenar registros automáticos, activar **Attack Protection → CAPTCHA** (Cloudflare Turnstile o hCaptcha); hoy la app no lo usa, así que primero habría que agregarlo al formulario.
+5. **Authentication → Rate Limits**: revisar el límite de correos por hora y de registros por IP. Para frenar registros automáticos, usar el CAPTCHA (sección siguiente).
 6. Desplegar la Edge Function `admin-users` y aplicar la migración `20261015120000_registro_vecinos.sql`.
+
+### CAPTCHA (Cloudflare Turnstile, gratis)
+
+Frena los registros automáticos. La app lo trae listo y **se activa solo cuando hay clave pública**: sin `VITE_TURNSTILE_SITE_KEY` no se carga nada de Cloudflare y los formularios funcionan como siempre. Casi siempre se resuelve solo, sin que la persona haga nada.
+
+Supabase aplica el CAPTCHA a **registro, inicio de sesión y recuperación de contraseña a la vez** (no se puede elegir uno), por eso los tres formularios, y los botones de reenviar correo, mandan el token.
+
+**El orden importa.** Si se activa en Supabase antes de que la app publicada mande el token, **nadie puede iniciar sesión, administradores incluidos**. Orden seguro:
+
+1. En Cloudflare (Turnstile → Add widget): crear un widget en modo **Managed**, con los dominios `consorcio-soft.vercel.app` y `localhost`. Copiar la *Site Key* (pública) y la *Secret Key*.
+2. En Vercel (Settings → Environment Variables): `VITE_TURNSTILE_SITE_KEY` = la Site Key, y volver a desplegar. Esta variable se incorpora al compilar, así que sin nuevo despliegue no tiene efecto.
+3. Verificar en el sitio publicado que el formulario sigue funcionando (todavía sin exigirlo).
+4. En Supabase → Authentication → Attack Protection (o *Bot and Abuse Protection*): activar CAPTCHA, elegir Turnstile y pegar la **Secret Key**. La clave secreta va solo ahí, nunca en el repositorio ni en Vercel.
+5. Probar de nuevo registro, inicio de sesión y recuperación. Si algo falla, **desactivar el CAPTCHA en Supabase** devuelve todo al estado anterior al instante.
+
+Para desarrollo local, poné la misma Site Key en un `.env.local` (el widget incluye `localhost`). Las claves de prueba de Cloudflare (como `1x00000000000000000000AA`, que siempre aprueba) solo sirven mientras el CAPTCHA esté **desactivado** en Supabase: con la clave secreta real activada, Supabase rechaza sus tokens de mentira.
 
 Las cuentas que se registran y nunca verifican su correo no tienen perfil (no aparecen en Usuarios) pero ocupan lugar en Supabase Auth. Para borrarlas pasados 7 días, ejecutá en el SQL Editor `select public.purgar_cuentas_sin_verificar(7);` o programalo con pg_cron:
 
