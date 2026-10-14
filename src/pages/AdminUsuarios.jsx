@@ -30,10 +30,10 @@ function leerBusquedaGuardada() {
 function Filtro({ etiqueta, children }) {
   return (
     <div role="group" aria-label={etiqueta}>
-      <p className="mb-1.5 px-1 text-xs font-medium tracking-wide text-stone-500 uppercase">
+      <p className="mb-1.5 px-1 text-center text-xs font-medium tracking-wide text-stone-500 uppercase">
         {etiqueta}
       </p>
-      <div className="flex flex-wrap gap-2">{children}</div>
+      <div className="flex flex-wrap justify-center gap-2">{children}</div>
     </div>
   );
 }
@@ -65,10 +65,12 @@ function Chip({ activo, onClick, contador, children }) {
 //   de baja   → Reactivar / Eliminar
 function AccionesUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
   const estado = estadoPerfil(usuario);
+  // pointer-events-auto: la fila entera es un enlace y sus botones tienen que
+  // recibir el toque ellos mismos, no el enlace que está detrás.
   const secundario =
-    "rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50";
+    "pointer-events-auto rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50";
   const peligro =
-    "rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
+    "pointer-events-auto rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="flex gap-2">
@@ -88,7 +90,7 @@ function AccionesUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
         disabled={ocupado}
         className={
           estado === "pendiente"
-            ? "rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
+            ? "pointer-events-auto rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-50"
             : secundario
         }
       >
@@ -99,6 +101,129 @@ function AccionesUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
             : "Reactivar"}
       </button>
     </div>
+  );
+}
+
+// Las columnas de escritorio se comparten entre el encabezado y las filas.
+const COLUMNAS =
+  "lg:grid-cols-[2.75rem_minmax(0,1fr)_8rem_6.5rem_13rem_1.25rem]";
+
+const inicial = (texto) =>
+  String(texto ?? "")
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+
+function FilasCargando() {
+  return (
+    <ul aria-hidden="true" className="divide-y divide-stone-100">
+      {[0, 1, 2, 3, 4].map((n) => (
+        <li key={n} className="flex items-center gap-4 px-4 py-3.5 lg:px-5">
+          <div className="h-11 w-11 shrink-0 animate-pulse rounded-full bg-stone-100 motion-reduce:animate-none" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-1/3 animate-pulse rounded bg-stone-100 motion-reduce:animate-none" />
+            <div className="h-3 w-1/2 animate-pulse rounded bg-stone-100 motion-reduce:animate-none" />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const flecha = (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-5 w-5 shrink-0 text-stone-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-600"
+  >
+    <path d="m9 18 6-6-6-6" />
+  </svg>
+);
+
+// Toda la fila lleva al perfil. El enlace del nombre se extiende sobre la fila
+// entera (el ::after) y los botones de acción quedan por encima, así no hay
+// botones dentro de un enlace y el teclado y los lectores de pantalla ven un
+// único enlace por persona.
+function FilaUsuario({ usuario, ocupado, onCambiarEstado, onEliminar }) {
+  const nombreCompleto =
+    `${usuario.nombre ?? ""} ${usuario.apellido ?? ""}`.trim() || "Sin nombre";
+  const rol = usuario.rol === "admin" ? "Administrador" : "Usuario";
+
+  return (
+    <li className="group relative transition-colors hover:bg-amber-50/70 has-[a:focus-visible]:bg-amber-50/70 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-brand-600/50 has-[a:focus-visible]:ring-inset">
+      <div
+        className={`px-4 py-3.5 lg:grid lg:items-center lg:gap-4 lg:px-5 ${COLUMNAS}`}
+      >
+        <div className="flex items-center gap-3 lg:contents">
+          <div
+            aria-hidden="true"
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+              usuario.rol === "admin"
+                ? "bg-brand-700 text-white"
+                : "bg-amber-100 text-amber-800"
+            }`}
+          >
+            {inicial(usuario.nombre)}
+            {inicial(usuario.apellido)}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/admin/usuarios/${usuario.id}`}
+              className="block truncate font-semibold text-stone-900 outline-none after:absolute after:inset-0 after:content-['']"
+            >
+              {nombreCompleto}
+            </Link>
+            <p className="truncate text-sm text-stone-500">{usuario.email}</p>
+            {usuario.unidad_declarada &&
+              estadoPerfil(usuario) === "pendiente" && (
+                <p className="mt-0.5 truncate text-xs text-stone-600">
+                  Dice vivir en: {usuario.unidad_declarada}
+                </p>
+              )}
+          </div>
+
+          <EstadoUsuario perfil={usuario} className="lg:hidden" />
+          <span className="lg:hidden">{flecha}</span>
+        </div>
+
+        <span
+          className={`hidden text-sm lg:block ${
+            usuario.rol === "admin"
+              ? "font-medium text-brand-700"
+              : "text-stone-600"
+          }`}
+        >
+          {rol}
+        </span>
+        <span className="hidden lg:block">
+          <EstadoUsuario perfil={usuario} />
+        </span>
+
+        <div className="pointer-events-none relative z-10 mt-3 flex items-center justify-between gap-2 border-t border-stone-100 pt-3 lg:mt-0 lg:justify-end lg:border-0 lg:pt-0">
+          <span
+            className={`text-xs font-medium lg:hidden ${
+              usuario.rol === "admin" ? "text-brand-700" : "text-stone-500"
+            }`}
+          >
+            {rol}
+          </span>
+          <AccionesUsuario
+            usuario={usuario}
+            ocupado={ocupado}
+            onCambiarEstado={onCambiarEstado}
+            onEliminar={onEliminar}
+          />
+        </div>
+
+        <span className="hidden lg:block">{flecha}</span>
+      </div>
+    </li>
   );
 }
 
@@ -812,7 +937,7 @@ export default function AdminUsuarios() {
               </button>
             )}
           </div>
-          <div className="flex flex-col gap-4 sm:flex-row sm:gap-10">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-center sm:gap-10">
             <Filtro etiqueta="Estado">
               <Chip
                 activo={estadoFiltro === "todos"}
@@ -873,10 +998,6 @@ export default function AdminUsuarios() {
           </p>
         )}
 
-        {usuarios === null && !listError && (
-          <p className="mt-6 text-sm text-stone-500">Cargando usuarios...</p>
-        )}
-
         {usuarios?.length === 0 && !buscando && (
           <div className="mt-6 rounded-2xl border border-stone-200 bg-white px-4 py-10 text-center shadow-sm">
             {filtrando ? (
@@ -911,99 +1032,36 @@ export default function AdminUsuarios() {
           aria-busy={buscando}
           className={`transition-opacity ${buscando && usuarios ? "opacity-60" : ""}`}
         >
-          {/* Mobile: tarjetas apiladas */}
-          <div className="mt-6 space-y-3 sm:hidden">
-            {usuarios?.map((u) => (
+          {usuarios === null && !listError && (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+              <FilasCargando />
+            </div>
+          )}
+
+          {usuarios?.length > 0 && (
+            <div className="mt-6 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
               <div
-                key={u.id}
-                className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+                aria-hidden="true"
+                className={`hidden border-b border-stone-200 bg-stone-50 px-5 py-2.5 text-xs font-medium tracking-wide text-stone-500 uppercase lg:grid lg:gap-4 ${COLUMNAS}`}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={`/admin/usuarios/${u.id}`}
-                    className="min-w-0 flex-1"
-                  >
-                    <p className="truncate font-semibold text-stone-900">
-                      {u.nombre} {u.apellido}
-                    </p>
-                    <p className="truncate text-sm text-stone-500">{u.email}</p>
-                    {u.unidad_declarada && estadoPerfil(u) === "pendiente" && (
-                      <p className="mt-1 text-sm text-stone-600">
-                        Dice vivir en: {u.unidad_declarada}
-                      </p>
-                    )}
-                  </Link>
-                  <EstadoUsuario perfil={u} />
-                </div>
-                <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
-                  <span className="text-xs font-medium text-stone-500">
-                    {u.rol === "admin" ? "Administrador" : "Usuario"}
-                  </span>
-                  <AccionesUsuario
+                <span />
+                <span>Usuario</span>
+                <span>Rol</span>
+                <span>Estado</span>
+                <span className="text-right">Acciones</span>
+                <span />
+              </div>
+              <ul className="divide-y divide-stone-100">
+                {usuarios.map((u) => (
+                  <FilaUsuario
+                    key={u.id}
                     usuario={u}
                     ocupado={accionPendiente === u.id}
                     onCambiarEstado={handleClickEstado}
                     onEliminar={empezarEliminacion}
                   />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* sm+: tabla */}
-          {usuarios?.length > 0 && (
-            <div className="mt-6 hidden overflow-x-auto rounded-2xl border border-stone-200 bg-white shadow-sm sm:block">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-stone-200 text-stone-500">
-                    <th className="px-4 py-3 font-medium">Nombre</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Rol</th>
-                    <th className="px-4 py-3 font-medium">Estado</th>
-                    <th className="px-4 py-3 font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios?.map((u) => (
-                    <tr
-                      key={u.id}
-                      className="border-b border-stone-100 last:border-0"
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/usuarios/${u.id}`}
-                          className="font-medium text-stone-900 hover:text-brand-700 hover:underline"
-                        >
-                          {u.nombre} {u.apellido}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-stone-600">
-                        {u.email}
-                        {u.unidad_declarada &&
-                          estadoPerfil(u) === "pendiente" && (
-                            <span className="mt-0.5 block text-xs text-stone-500">
-                              Dice vivir en: {u.unidad_declarada}
-                            </span>
-                          )}
-                      </td>
-                      <td className="px-4 py-3 text-stone-600">
-                        {u.rol === "admin" ? "Administrador" : "Usuario"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <EstadoUsuario perfil={u} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <AccionesUsuario
-                          usuario={u}
-                          ocupado={accionPendiente === u.id}
-                          onCambiarEstado={handleClickEstado}
-                          onEliminar={empezarEliminacion}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </ul>
             </div>
           )}
         </div>
