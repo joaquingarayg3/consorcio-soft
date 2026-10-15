@@ -3,10 +3,12 @@ import { useLocation, useSearch } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import {
   createClaim,
+  deleteClosedClaim,
   fetchClaimsForUser,
   fetchMyUnidadesFuncionales,
   updateClaimPriority,
 } from "../services/claims";
+import ConfirmDialog from "./ConfirmDialog";
 import { ModalFormButton } from "./ModalForm";
 import { mensajeDeError } from "../utils/supabase-errors";
 import { coincideBusqueda } from "../utils/texto";
@@ -114,6 +116,7 @@ function ClaimRow({
   isAdmin,
   pending,
   onPriorityChange,
+  onDelete,
   edificioId,
   mostrarEdificio,
 }) {
@@ -196,19 +199,31 @@ function ClaimRow({
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex flex-col gap-2">
-            <select
-              aria-label="Cambiar prioridad"
-              value={priority}
-              disabled={pending}
-              onChange={(event) =>
-                onPriorityChange(claim.id, event.target.value)
-              }
-              className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-brand-600 focus:outline-none"
-            >
-              {priorities.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
+            {onDelete ? (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onDelete(claim)}
+                aria-label={`Borrar el reclamo ${etiquetaReclamo(claim)}`}
+                className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Borrar
+              </button>
+            ) : (
+              <select
+                aria-label="Cambiar prioridad"
+                value={priority}
+                disabled={pending}
+                onChange={(event) =>
+                  onPriorityChange(claim.id, event.target.value)
+                }
+                className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 focus:border-brand-600 focus:outline-none"
+              >
+                {priorities.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            )}
           </div>
         </td>
       )}
@@ -255,6 +270,7 @@ function ClaimsTable({
   isAdmin,
   pending,
   onPriorityChange,
+  onDelete,
   edificioId,
   mostrarEdificio = false,
   agrupar = false,
@@ -267,6 +283,7 @@ function ClaimsTable({
       claim={claim}
       isAdmin={isAdmin}
       onPriorityChange={onPriorityChange}
+      onDelete={onDelete}
       pending={pending}
       edificioId={edificioId}
       mostrarEdificio={mostrarEdificio}
@@ -342,6 +359,9 @@ export default function ClaimsPanel({ edificio = null }) {
   const [edificioFilter, setEdificioFilter] = useState("todos");
   const [agrupar, setAgrupar] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [claimToDelete, setClaimToDelete] = useState(null);
+  // Resultado del último borrado, se muestra junto al historial: { error, texto }.
+  const [resultadoBorrado, setResultadoBorrado] = useState(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -442,6 +462,30 @@ export default function ClaimsPanel({ edificio = null }) {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteClaim() {
+    const claim = claimToDelete;
+    if (!claim) return;
+    setSaving(true);
+    try {
+      const { fotosSinBorrar } = await deleteClosedClaim(claim.id);
+      setClaims((current) => (current || []).filter((c) => c.id !== claim.id));
+      setResultadoBorrado({
+        error: false,
+        texto: fotosSinBorrar
+          ? `Se borró el reclamo ${etiquetaReclamo(claim)}, pero no se pudieron quitar sus fotos del almacenamiento.`
+          : `Se borró el reclamo ${etiquetaReclamo(claim)}.`,
+      });
+    } catch (actionError) {
+      setResultadoBorrado({
+        error: true,
+        texto: mensajeDeError(actionError, "No se pudo borrar el reclamo."),
+      });
+    } finally {
+      setSaving(false);
+      setClaimToDelete(null);
     }
   }
 
@@ -788,6 +832,18 @@ export default function ClaimsPanel({ edificio = null }) {
               {historyOpen ? "Ocultar" : "Ver historial"}
             </span>
           </button>
+          {historyOpen && resultadoBorrado && (
+            <p
+              role={resultadoBorrado.error ? "alert" : "status"}
+              className={`mx-4 mb-3 rounded-lg border px-3 py-2 text-sm ${
+                resultadoBorrado.error
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-green-200 bg-green-50 text-green-800"
+              }`}
+            >
+              {resultadoBorrado.texto}
+            </p>
+          )}
           {historyOpen && (
             <ClaimsTable
               claims={historyClaims}
@@ -795,12 +851,26 @@ export default function ClaimsPanel({ edificio = null }) {
               agrupar={agrupar}
               isAdmin={isAdmin}
               onPriorityChange={handlePriorityChange}
+              onDelete={isAdmin ? setClaimToDelete : undefined}
               pending={saving}
               edificioId={edificioId}
             />
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(claimToDelete)}
+        title="¿Borrar este reclamo?"
+        message={
+          claimToDelete
+            ? `Se va a borrar para siempre el reclamo ${etiquetaReclamo(claimToDelete)} “${titleOf(claimToDelete)}”, con sus comentarios, fotos y notificaciones. No se puede deshacer.`
+            : ""
+        }
+        confirmLabel="Borrar reclamo"
+        pending={saving}
+        onConfirm={handleDeleteClaim}
+        onCancel={() => !saving && setClaimToDelete(null)}
+      />
       {formOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/45 px-4 py-6"
