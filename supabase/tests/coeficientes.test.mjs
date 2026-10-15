@@ -14,6 +14,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const leer = (ruta) => readFileSync(fileURLToPath(new URL(ruta, import.meta.url)), "utf8");
 const MIGRACION = leer("../migrations/20261018120000_coeficientes.sql");
+const MIGRACION_VERSIONES = leer("../migrations/20261019120000_nueva_version_esquema.sql");
 
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const VECINO_A = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"; // tiene una unidad en el edificio A
@@ -140,6 +141,7 @@ before(async () => {
   legado.vacio = await cargar("Legado vacío", [0, 0]);
 
   await aplicarMigracion();
+  await db.exec(MIGRACION_VERSIONES);
 });
 
 describe("Migración", () => {
@@ -601,5 +603,96 @@ describe("Integridad", () => {
       cerca((await uno("select public.validar_esquema($1) as s", [laxo])).s, 0.9985);
       await debeFallar(intentar("select public.crear_esquema($1,'MAL','Mal','manual',null,null,0.5)", [ed]), /tolerancia_chk|check/);
     });
+  });
+});
+
+describe("Nueva versión de un esquema", () => {
+  const publicado = async (ed, codigo, filas, extra = {}) => {
+    const id = await crearEsquema(ed, codigo, { desde: "2026-01-01", ...extra });
+    await guardar(id, filas);
+    await comoAdmin(() => uno("select public.publicar_esquema($1)", [id]));
+    return id;
+  };
+  const nuevaVersion = (esquema, desde) =>
+    comoAdmin(async () => (await uno("select public.nueva_version_esquema($1, $2::date) as id", [esquema, desde])).id);
+
+  it("cierra la vigencia actual, crea un borrador y copia los valores", async () => {
+    const ed = await crearEdificio("Versiones");
+    const u = await crearUnidades(ed, ["1A", "1B"]);
+    const v1 = await publicado(ed, "GENERAL", [{ unidad_id: u["1A"], valor: 0.6 }, { unidad_id: u["1B"], valor: 0.4 }]);
+    const v2 = await nuevaVersion(v1, "2027-01-01");
+
+    const viejo = await uno("select estado, vigente_hasta::text as hasta from public.esquema_coeficiente where id=$1", [v1]);
+    assert.equal(viejo.estado, "publicado");
+    assert.equal(viejo.hasta, "2027-01-01");
+    const nuevo = await uno("select codigo, estado, vigente_desde::text as desde, vigente_hasta from public.esquema_coeficiente where id=$1", [v2]);
+    assert.deepEqual([nuevo.codigo, nuevo.estado, nuevo.desde, nuevo.vigente_hasta], ["GENERAL", "borrador", "2027-01-01", null]);
+    assert.deepEqual(await valores(v2), { "1A": 0.6, "1B": 0.4 });
+
+    // la versión nueva se corrige sin tocar la anterior
+    await guardar(v2, [{ unidad_id: u["1A"], valor: 0.7 }, { unidad_id: u["1B"], valor: 0.3 }]);
+    assert.deepEqual(await valores(v1), { "1A": 0.6, "1B": 0.4 });
+    await comoAdmin(() => uno("select public.publicar_esquema($1)", [v2]));
+  });
+
+  it("el derivado pasa a derivar de la versión nueva de su base", async () => {
+    const ed = await crearEdificio("Versiones derivadas");
+    const u = await crearUnidades(ed, ["1A", "1B", "2A"]);
+    const gen1 = await publicado(ed, "GENERAL", [{ unidad_id: u["1A"], valor: 0.5 }, { unidad_id: u["1B"], valor: 0.3 }, { unidad_id: u["2A"], valor: 0.2 }]);
+    const hijo1 = await publicado(ed, "PISO1", [{ unidad_id: u["1A"] }, { unidad_id: u["1B"] }], { metodo: "derivado", base: gen1 });
+
+    const gen2 = await nuevaVersion(gen1, "2027-01-01");
+    await guardar(gen2, [{ unidad_id: u["1A"], valor: 0.4 }, { unidad_id: u["1B"], valor: 0.4 }, { unidad_id: u["2A"], valor: 0.2 }]);
+    const hijo2 = await nuevaVersion(hijo1, "2027-01-01");
+
+    const base = await uno("select esquema_base_id from public.esquema_coeficiente where id=$1", [hijo2]);
+    assert.equal(base.esquema_base_id, gen2);
+    const v = await valores(hijo2);
+    cerca(v["1A"], 0.5, 1e-9);
+    cerca(v["1B"], 0.5, 1e-9);
+    // la versión vieja sigue derivando de la vieja
+    cerca((await valores(hijo1))["1A"], 0.5 / 0.8, 1e-9);
+  });
+
+  it("sin versión nueva de la base, el derivado sigue apuntando a la que rige", async () => {
+    const ed = await crearEdificio("Versiones sin base nueva");
+    const u = await crearUnidades(ed, ["1A", "1B"]);
+    const gen = await publicado(ed, "GENERAL", [{ unidad_id: u["1A"], valor: 0.6 }, { unidad_id: u["1B"], valor: 0.4 }]);
+    const hijo1 = await publicado(ed, "SOLO_A", [{ unidad_id: u["1A"] }], { metodo: "derivado", base: gen });
+    const hijo2 = await nuevaVersion(hijo1, "2027-01-01");
+    assert.equal((await uno("select esquema_base_id from public.esquema_coeficiente where id=$1", [hijo2])).esquema_base_id, gen);
+  });
+
+  it("rechaza lo que no corresponde", async () => {
+    const ed = await crearEdificio("Versiones inválidas");
+    const u = await crearUnidades(ed, ["1A"]);
+    const borrador = await crearEsquema(ed, "BORRADOR");
+    const pub = await publicado(ed, "GENERAL", [{ unidad_id: u["1A"], valor: 1 }]);
+    await comoAdmin(async () => {
+      await debeFallar(intentar("select public.nueva_version_esquema($1, '2027-01-01')", [borrador]), /publicado/);
+      await debeFallar(intentar("select public.nueva_version_esquema($1, '2026-01-01')", [pub]), /después de la actual/);
+      await debeFallar(intentar("select public.nueva_version_esquema($1, '2025-06-01')", [pub]), /después de la actual/);
+      await debeFallar(intentar("select public.nueva_version_esquema($1, null)", [pub]), /después de la actual/);
+    });
+    await nuevaVersion(pub, "2027-01-01");
+    await comoAdmin(() => debeFallar(intentar("select public.nueva_version_esquema($1, '2028-01-01')", [pub]), /ya tiene fecha de fin/));
+    await como(VECINO_A, () => debeFallar(intentar("select public.nueva_version_esquema($1, '2029-01-01')", [pub]), /Solo la administración/));
+    // si algo falla no queda nada a medias: el esquema sigue cerrado solo una vez
+    const versiones = await q("select 1 from public.esquema_coeficiente where edificio_id=$1 and codigo='GENERAL'", [ed]);
+    assert.equal(versiones.length, 2);
+  });
+
+  it("si el recálculo falla, no queda ni la vigencia cerrada ni la versión creada", async () => {
+    const ed = await crearEdificio("Versiones atómicas");
+    const u = await crearUnidades(ed, ["1A", "1B"]);
+    const gen = await publicado(ed, "GENERAL", [{ unidad_id: u["1A"], valor: 0.5 }, { unidad_id: u["1B"], valor: 0.5 }]);
+    const hijo = await publicado(ed, "HIJO", [{ unidad_id: u["1A"] }, { unidad_id: u["1B"] }], { metodo: "derivado", base: gen });
+    // versión nueva del GENERAL SIN la unidad 1B: el hijo nuevo no podría derivar de ella
+    const gen2 = await nuevaVersion(gen, "2027-01-01");
+    await guardar(gen2, [{ unidad_id: u["1A"], valor: 1 }]);
+    await comoAdmin(() => debeFallar(intentar("select public.nueva_version_esquema($1, '2027-01-01')", [hijo]), /no están en su esquema base: 1B/));
+    const intacto = await uno("select vigente_hasta from public.esquema_coeficiente where id=$1", [hijo]);
+    assert.equal(intacto.vigente_hasta, null);
+    assert.equal((await q("select 1 from public.esquema_coeficiente where edificio_id=$1 and codigo='HIJO'", [ed])).length, 1);
   });
 });

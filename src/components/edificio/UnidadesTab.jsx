@@ -11,6 +11,7 @@ import {
   sumarCoeficientes,
 } from "../../utils/coeficientes";
 import { asignacionVigente, hoy } from "../../utils/fechas";
+import { compararUnidades } from "../../utils/unidades";
 import { mensajeDeError } from "../../utils/supabase-errors";
 
 function obtenerUnidades(edificioId) {
@@ -34,29 +35,6 @@ const asignacionActiva = (a) => asignacionVigente(a);
 function comoArray(valor) {
   if (Array.isArray(valor)) return valor;
   return valor ? [valor] : [];
-}
-
-// Número de piso para ordenar: "PB" y "planta baja" valen 0, los subsuelos son
-// negativos y lo que no tiene piso (o no se entiende) va al final.
-function numeroDePiso(piso) {
-  const texto = String(piso ?? "")
-    .trim()
-    .toLowerCase();
-  if (!texto) return Number.POSITIVE_INFINITY;
-  if (texto === "pb" || texto.startsWith("planta baja")) return 0;
-  if (texto === "ss" || texto.startsWith("subsuelo")) return -1;
-  const numero = Number.parseFloat(texto.replace(",", "."));
-  return Number.isFinite(numero) ? numero : Number.POSITIVE_INFINITY;
-}
-
-// De menor a mayor piso; a igual piso, por nombre ("2A" antes que "10A").
-function compararUnidades(a, b) {
-  const porPiso = numeroDePiso(a.piso) - numeroDePiso(b.piso);
-  if (porPiso !== 0 && !Number.isNaN(porPiso)) return porPiso;
-  return String(a.identificador).localeCompare(String(b.identificador), "es", {
-    numeric: true,
-    sensitivity: "base",
-  });
 }
 
 // Solo se piden los perfiles de quienes ya están asignados (para mostrar sus
@@ -117,6 +95,8 @@ export default function UnidadesTab({ edificioId }) {
 
   const [editandoId, setEditandoId] = useState(null);
   const [editIdentificador, setEditIdentificador] = useState("");
+  const [editNumeroUf, setEditNumeroUf] = useState("");
+  const [editPrincipalId, setEditPrincipalId] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -213,6 +193,8 @@ export default function UnidadesTab({ edificioId }) {
   function empezarEdicion(unidad) {
     setEditandoId(unidad.id);
     setEditIdentificador(unidad.identificador);
+    setEditNumeroUf(unidad.numero_uf ?? "");
+    setEditPrincipalId(unidad.unidad_principal_id ?? "");
     setEditError(null);
   }
 
@@ -226,10 +208,21 @@ export default function UnidadesTab({ edificioId }) {
       return;
     }
 
+    // "UF 21", "uf21" y "21" son lo mismo: se guarda solo el número.
+    const numeroUf = editNumeroUf.replace(/^uf\s*/i, "").trim();
+    if (numeroUf.length > 20) {
+      setEditError("El número de UF es demasiado largo.");
+      return;
+    }
+
     setGuardandoEdicion(true);
     const { error } = await supabase
       .from("unidad_funcional")
-      .update({ identificador: nuevoIdentificador })
+      .update({
+        identificador: nuevoIdentificador,
+        numero_uf: numeroUf || null,
+        unidad_principal_id: editPrincipalId || null,
+      })
       .eq("id", unidad.id)
       .select("id")
       .single();
@@ -497,7 +490,11 @@ export default function UnidadesTab({ edificioId }) {
           );
           const editando = editandoId === u.id;
           const coeficiente = general?.valores?.[u.id];
+          const tieneAnexas = unidadesOrdenadas.some(
+            (otra) => otra.unidad_principal_id === u.id,
+          );
           const detalle = [
+            u.numero_uf ? `UF ${u.numero_uf}` : null,
             u.superficie_m2 ? `${u.superficie_m2} m²` : null,
             coeficiente != null
               ? `${formatearPorcentaje(coeficiente)} coef. general`
@@ -536,6 +533,63 @@ export default function UnidadesTab({ edificioId }) {
                         disabled={guardandoEdicion}
                         className={inputClass}
                       />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor={`edit-uf-${u.id}`} className={labelClass}>
+                        Número de UF{" "}
+                        <span className="font-normal text-stone-400">
+                          (opcional)
+                        </span>
+                      </label>
+                      <input
+                        id={`edit-uf-${u.id}`}
+                        type="text"
+                        autoComplete="off"
+                        maxLength={24}
+                        placeholder="Ej.: 21"
+                        value={editNumeroUf}
+                        onChange={(e) => setEditNumeroUf(e.target.value)}
+                        disabled={guardandoEdicion}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={`edit-principal-${u.id}`}
+                        className={labelClass}
+                      >
+                        Anexa a{" "}
+                        <span className="font-normal text-stone-400">
+                          (cochera o baulera de un depto.)
+                        </span>
+                      </label>
+                      <select
+                        id={`edit-principal-${u.id}`}
+                        value={editPrincipalId}
+                        onChange={(e) => setEditPrincipalId(e.target.value)}
+                        disabled={guardandoEdicion || tieneAnexas}
+                        className={inputClass}
+                      >
+                        <option value="">Ninguna (unidad propia)</option>
+                        {unidadesOrdenadas
+                          .filter(
+                            (otra) =>
+                              otra.id !== u.id && !otra.unidad_principal_id,
+                          )
+                          .map((otra) => (
+                            <option key={otra.id} value={otra.id}>
+                              {otra.identificador}
+                            </option>
+                          ))}
+                      </select>
+                      {tieneAnexas && (
+                        <p className="mt-1 text-xs text-stone-500">
+                          Tiene unidades anexas, así que no puede ser anexa de
+                          otra.
+                        </p>
+                      )}
                     </div>
                   </div>
                   {editError && (
