@@ -2,6 +2,15 @@
 -- claves foráneas con borrado en cascada y triggers revisados en la base real).
 -- Se carga DESPUÉS de base_schema.sql. No es una migración.
 
+-- La tabla de cuentas de Supabase (la usa la función de eliminar usuarios).
+create table if not exists auth.users (id uuid primary key);
+
+-- Columnas de producción que usan los nombres en reclamos.
+alter table public.perfiles add column nombre text, add column apellido text;
+alter table public.unidad_usuarios
+  add column fecha_desde date not null default current_date,
+  add column fecha_hasta date;
+
 create table public.reclamos (
   id uuid primary key default gen_random_uuid(),
   unidad_funcional_id uuid references public.unidad_funcional (id),

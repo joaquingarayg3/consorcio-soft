@@ -15,6 +15,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 const leer = (ruta) => readFileSync(fileURLToPath(new URL(ruta, import.meta.url)), "utf8");
 const MIGRACION = leer("../migrations/20261020120000_borrar_reclamos_cerrados.sql");
+const MIGRACION_NOMBRES = leer("../migrations/20261021120000_nombres_en_reclamos.sql");
 
 const ADMIN = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const VECINO = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -170,5 +171,169 @@ describe("Borrar reclamos cerrados", () => {
     await db.exec(MIGRACION);
     const id = await crearReclamo("cerrado");
     assert.equal((await eliminar(id)).ok, true);
+  });
+});
+
+describe("Nombres en reclamos y comentarios", () => {
+  const VECINO2 = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"; // otra persona del mismo edificio
+  const BAJA = "dddddddd-dddd-4ddd-8ddd-dddddddddddd"; // usuario inactivo a eliminar
+  let viejoReclamo;
+  let comentarioVecino;
+  let comentarioAdmin;
+  let unidad2;
+  let unidadOtroEdificio;
+  const comentar = (usuario, reclamo, extra) =>
+    como(usuario, () =>
+      intentar(
+        `insert into public.reclamo_comentarios (reclamo_id, usuario_id, comentario${extra ? ", " + extra.columnas : ""})
+         values ($1,$2,'hola'${extra ? ", " + extra.valores : ""}) returning *`,
+        [reclamo, usuario],
+      ),
+    );
+
+  before(async () => {
+    await db.query("update public.perfiles set nombre='Juan', apellido='Pérez' where id=$1", [VECINO]);
+    await db.query("update public.perfiles set nombre='Ada', apellido='Admin' where id=$1", [ADMIN]);
+    await db.query("insert into public.perfiles (id, rol, nombre, apellido) values ($1,'user','Lucía','Gómez')", [VECINO2]);
+    unidad2 = (
+      await uno(
+        "insert into public.unidad_funcional (edificio_id, identificador, tipo, porcentaje_fiscal) values ($1,'3C','departamento',0) returning id",
+        [edificio],
+      )
+    ).id;
+    const otro = (await uno("insert into public.edificio (nombre) values ('Otro') returning id")).id;
+    unidadOtroEdificio = (
+      await uno(
+        "insert into public.unidad_funcional (edificio_id, identificador, tipo, porcentaje_fiscal) values ($1,'Z9','departamento',0) returning id",
+        [otro],
+      )
+    ).id;
+    await db.query("insert into public.unidad_usuarios (usuario_id, unidad_id) values ($1,$2)", [VECINO2, unidad]);
+
+    // Lo que ya existía antes de la migración.
+    viejoReclamo = await crearReclamo("abierto");
+    comentarioVecino = (await uno("select id from public.reclamo_comentarios where reclamo_id=$1", [viejoReclamo])).id;
+    comentarioAdmin = (
+      await uno(
+        "insert into public.reclamo_comentarios (reclamo_id, usuario_id, comentario) values ($1,$2,'del admin') returning id",
+        [viejoReclamo, ADMIN],
+      )
+    ).id;
+    await db.exec(MIGRACION_NOMBRES);
+  });
+
+  const fila = (id) => uno("select * from public.reclamo_comentarios where id=$1", [id]);
+
+  it("completa lo que ya existía, sin llenar el historial", async () => {
+    const v = await fila(comentarioVecino);
+    assert.deepEqual([v.autor_nombre, v.autor_unidad, v.autor_es_admin], ["Juan Pérez", "1A", false]);
+    const a = await fila(comentarioAdmin);
+    assert.deepEqual([a.autor_nombre, a.autor_unidad, a.autor_es_admin], ["Ada Admin", null, true]);
+    const r = await uno("select reportante_nombre, reportante_es_admin from public.reclamos where id=$1", [viejoReclamo]);
+    assert.deepEqual([r.reportante_nombre, r.reportante_es_admin], ["Juan Pérez", false]);
+    const acciones = (await q("select accion from public.reclamos_historial where reclamo_id=$1", [viejoReclamo])).map((f) => f.accion);
+    assert.deepEqual(acciones, ["INSERT"], "el relleno no debe quedar como cambio en el historial");
+  });
+
+  it("un comentario nuevo copia el nombre y la unidad, y pisa lo que mande el cliente", async () => {
+    const r = await comentar(VECINO, viejoReclamo, {
+      columnas: "autor_nombre, autor_unidad, autor_es_admin",
+      valores: "'Falso Nombre', '99Z', true",
+    });
+    assert.equal(r.ok, true, r.mensaje);
+    const c = r.filas[0];
+    assert.deepEqual([c.autor_nombre, c.autor_unidad, c.autor_es_admin], ["Juan Pérez", "1A", false]);
+  });
+
+  it("la unidad es la de ese edificio y vigente: no cuenta otro edificio ni asignaciones terminadas", async () => {
+    await db.query("insert into public.unidad_usuarios (usuario_id, unidad_id) values ($1,$2)", [VECINO, unidadOtroEdificio]);
+    await db.query(
+      "insert into public.unidad_usuarios (usuario_id, unidad_id, fecha_desde, fecha_hasta) values ($1,$2,'2020-01-01','2021-01-01')",
+      [VECINO, unidad2],
+    );
+    let c = (await comentar(VECINO, viejoReclamo)).filas[0];
+    assert.equal(c.autor_unidad, "1A");
+    await db.query("insert into public.unidad_usuarios (usuario_id, unidad_id) values ($1,$2)", [VECINO, unidad2]);
+    c = (await comentar(VECINO, viejoReclamo)).filas[0];
+    assert.equal(c.autor_unidad, "1A, 3C");
+  });
+
+  it("la administración figura como tal y sin unidad", async () => {
+    const c = (await comentar(ADMIN, viejoReclamo)).filas[0];
+    assert.deepEqual([c.autor_nombre, c.autor_unidad, c.autor_es_admin], ["Ada Admin", null, true]);
+  });
+
+  it("un reclamo nuevo copia el nombre de quien lo carga", async () => {
+    const r = await como(VECINO, () =>
+      intentar(
+        "insert into public.reclamos (unidad_funcional_id, reportante_id, reportante_nombre, reportante_es_admin) values ($1,$2,'Otro',true) returning *",
+        [unidad, VECINO],
+      ),
+    );
+    assert.equal(r.ok, true, r.mensaje);
+    assert.deepEqual([r.filas[0].reportante_nombre, r.filas[0].reportante_es_admin], ["Juan Pérez", false]);
+    const a = await como(ADMIN, () =>
+      intentar("insert into public.reclamos (unidad_funcional_id, reportante_id) values ($1,$2) returning *", [unidad, ADMIN]),
+    );
+    assert.deepEqual([a.filas[0].reportante_nombre, a.filas[0].reportante_es_admin], ["Ada Admin", true]);
+  });
+
+  it("el nombre copiado no se cambia después, ni editando el comentario ni el perfil", async () => {
+    const r = await como(ADMIN, () =>
+      intentar(
+        "update public.reclamo_comentarios set comentario='editado', autor_nombre='Hacker', autor_unidad='9', autor_es_admin=true where id=$1 returning *",
+        [comentarioVecino],
+      ),
+    );
+    assert.equal(r.ok, true, r.mensaje);
+    const c = await fila(comentarioVecino);
+    assert.deepEqual([c.comentario, c.autor_nombre, c.autor_unidad, c.autor_es_admin], ["editado", "Juan Pérez", "1A", false]);
+    await como(ADMIN, () =>
+      intentar("update public.reclamos set reportante_nombre='Hacker', reportante_es_admin=true, prioridad='Alta' where id=$1", [viejoReclamo]),
+    );
+    const rec = await uno("select reportante_nombre, reportante_es_admin, prioridad from public.reclamos where id=$1", [viejoReclamo]);
+    assert.deepEqual([rec.reportante_nombre, rec.reportante_es_admin, rec.prioridad], ["Juan Pérez", false, "Alta"]);
+    await db.query("update public.perfiles set apellido='Rodríguez' where id=$1", [VECINO]);
+    assert.equal((await fila(comentarioVecino)).autor_nombre, "Juan Pérez");
+    await db.query("update public.perfiles set apellido='Pérez' where id=$1", [VECINO]);
+  });
+
+  it("otra persona del edificio lee el nombre, pero no el perfil de quien comentó", async () => {
+    const filas = await como(VECINO2, () =>
+      q("select autor_nombre, autor_unidad from public.reclamo_comentarios where reclamo_id=$1 order by created_at", [viejoReclamo]),
+    );
+    assert.ok(filas.some((f) => f.autor_nombre === "Juan Pérez" && f.autor_unidad));
+    const perfiles = await como(VECINO2, () => q("select id from public.perfiles where id=$1", [VECINO]));
+    assert.equal(perfiles.length, 0, "el perfil sigue siendo privado");
+  });
+
+  it("al eliminar un usuario se borra su nombre de comentarios, reclamos y copias del historial", async () => {
+    await db.query("insert into public.perfiles (id, rol, nombre, apellido, activo) values ($1,'user','Baja','Definitiva', false)", [BAJA]);
+    await db.query("insert into public.unidad_usuarios (usuario_id, unidad_id) values ($1,$2)", [BAJA, unidad]);
+    const { id: reclamo } = await uno(
+      "insert into public.reclamos (unidad_funcional_id, reportante_id) values ($1,$2) returning id",
+      [unidad, BAJA],
+    );
+    await db.query("update public.reclamos set prioridad='Alta' where id=$1", [reclamo]);
+    await db.query("insert into public.reclamo_comentarios (reclamo_id, usuario_id, comentario) values ($1,$2,'adiós')", [reclamo, BAJA]);
+    assert.equal((await uno("select reportante_nombre from public.reclamos where id=$1", [reclamo])).reportante_nombre, "Baja Definitiva");
+
+    await db.query("select public.eliminar_usuario_definitivo($1)", [BAJA]);
+
+    const rec = await uno("select reportante_id, reportante_nombre, reportante_es_admin from public.reclamos where id=$1", [reclamo]);
+    assert.deepEqual([rec.reportante_id, rec.reportante_nombre, rec.reportante_es_admin], [null, null, false]);
+    const com = await uno("select usuario_id, autor_nombre, autor_unidad from public.reclamo_comentarios where reclamo_id=$1", [reclamo]);
+    assert.deepEqual([com.usuario_id, com.autor_nombre, com.autor_unidad], [null, null, null]);
+    const rastro = await q(
+      "select 1 from public.reclamos_historial where reclamo_id=$1 and (datos_anteriores->>'reportante_nombre' is not null or datos_nuevos->>'reportante_nombre' is not null)",
+      [reclamo],
+    );
+    assert.equal(rastro.length, 0, "no deben quedar copias del nombre en el historial");
+    assert.equal((await q("select 1 from public.perfiles where id=$1", [BAJA])).length, 0);
+  });
+
+  it("aplicar la migración dos veces no pisa los nombres", async () => {
+    await db.exec(MIGRACION_NOMBRES);
+    assert.equal((await fila(comentarioVecino)).autor_nombre, "Juan Pérez");
   });
 });

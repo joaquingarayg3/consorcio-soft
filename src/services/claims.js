@@ -504,7 +504,7 @@ export async function fetchClaimComments(claimId) {
 
   const { data, error } = await supabase
     .from(COMMENTS_TABLE_NAME)
-    .select("*, autor:usuario_id ( nombre, apellido, email )")
+    .select("*")
     .eq("reclamo_id", claimId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -528,7 +528,7 @@ export async function addClaimComment({ claimId, userId, comment, author }) {
   const { data, error } = await supabase
     .from(COMMENTS_TABLE_NAME)
     .insert({ reclamo_id: claimId, usuario_id: userId, comentario: comment })
-    .select("*, autor:usuario_id ( nombre, apellido, email )")
+    .select("*")
     .single();
   if (error) throw error;
   return data;
