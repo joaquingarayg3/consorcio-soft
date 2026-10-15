@@ -80,6 +80,7 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20261013120000_inicio_vecino.sql` | Anuncios urgentes (`anuncios.urgente_hasta`), código de cada edificio (`edificio.codigo`, único, ej. `HP`) y número de reclamo por edificio (`reclamos.numero`, asignado por la base; el ticket se muestra `HP-0012`). Numera los reclamos ya existentes por orden de creación y les sugiere un código a los edificios actuales. **Hay que aplicarla antes de usar la versión nueva de la app.** |
 | `20261014120000_foto_edificio.sql` | Foto de cada edificio: columnas `foto_path`, `miniatura_path` y `foto_actualizada_en` en `edificio`, y el bucket privado `edificios` (la ven administradores y vecinos de ese edificio; solo administradores suben o borran). |
 | `20261015120000_registro_vecinos.sql` | Registro autónomo con aprobación: el perfil se crea **al verificar el correo**, siempre como pendiente (`activo = false`, `aprobado_en` vacío) y con rol `user`. Agrega `perfiles.aprobado_en` y `perfiles.unidad_declarada`, reemplaza el trigger anterior que creaba el perfil al registrarse, hace que una cuenta inactiva no vea nada del consorcio aunque tenga unidad (`usuario_en_unidad` / `usuario_en_edificio`), agrega el estado "pendientes" a `buscar_perfiles` y la función de limpieza `purgar_cuentas_sin_verificar`. Los perfiles que ya existían quedan como aprobados. **Requiere volver a desplegar la función `admin-users`** (activa y aprueba a quien crea un admin). |
+| `20261018120000_coeficientes.sql` | Modelo de coeficientes de prorrateo (ver "Coeficientes de prorrateo" más abajo): tablas `esquema_coeficiente` y `coeficiente`, vista `v_coeficiente_por_cuenta`, funciones `crear_esquema`, `guardar_coeficientes`, `recalcular_esquema`, `validar_esquema`, `publicar_esquema` y `despublicar_esquema`, y en `unidad_funcional`: `numero_uf`, `unidad_principal_id` (anexas), tipos admitidos (departamento, cochera, local, baulera, oficina, otro) y `edificio_id` obligatorio. Migra el `porcentaje_fiscal` actual al esquema `GENERAL` de cada edificio (como borrador). **Falla si hay unidades sin edificio.** |
 | `20261017120000_perfil_y_contactos.sql` | Datos fiscales y bancarios del edificio (`cuit`, `banco`, `titular_cuenta`, `cbu`, `alias_cbu`, con restricciones de formato; los ven los administradores y los vecinos de ese edificio, que es lo que ya permite la política de lectura de `edificio`), ciudad/provincia/código postal pasan a ser opcionales, tabla `edificio_contactos` (nombre y teléfono; los ven los vecinos del edificio y solo los administradores la modifican) y límite de columnas editables en `perfiles` (`nombre`, `apellido`, `telefono` y `rol`: antes la API dejaba modificar cualquier columna que el trigger no protegiera, como `created_at`). |
 | `20261016120000_imagenes_solo_cuentas_activas.sql` | Subir imágenes de reclamos pasa a exigir cuenta activa (crea `private.cuenta_activa()`): con el registro público, una cuenta pendiente ya no puede ocupar almacenamiento. |
 
@@ -104,6 +105,23 @@ Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, 
 - Las fotos van a un bucket privado, en una carpeta por usuario, y se muestran con URLs firmadas.
 
 `supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.
+
+## Coeficientes de prorrateo
+
+Cada edificio reparte sus gastos con uno o más **esquemas** de coeficientes; cada esquema es una bolsa de gasto que reparte el 100% (valor 1) entre las unidades que **tienen fila** en él (quien no tiene fila no paga esa bolsa).
+
+- **Unidades.** Cocheras, bauleras y locales son unidades (`unidad_funcional`). Una cochera o baulera que se liquida con un departamento se carga como unidad aparte con `unidad_principal_id`; `v_coeficiente_por_cuenta` suma cada cuenta (principal + anexas). Si la planilla trae dpto + cochera con un único coeficiente inseparable, se carga una sola unidad.
+- **Métodos.** `manual` (valor cargado), `derivado` (valor = coeficiente en el esquema base / suma de los participantes) y `partes_iguales` (peso / suma de pesos). Los derivados y las partes iguales se **guardan calculados**; `recalcular_esquema` los actualiza en cascada.
+- **Estados.** Un esquema nace en `borrador` (se guarda aunque no cierre). `publicar_esquema` recalcula, exige que sume 1 dentro de la **tolerancia propia del esquema** (por defecto ±0,0001) y lo publica; un derivado solo se publica si su base ya está publicada. Lo publicado no se edita: `despublicar_esquema` o, si cambia el reglamento, un esquema nuevo con otra vigencia (`vigente_desde` / `vigente_hasta`; dos vigencias del mismo código no pueden superponerse).
+- **Seguridad.** Solo la administración lee y escribe estas tablas (RLS). Las funciones corren con los permisos de quien las llama.
+- **Precisión.** `numeric(12,10)`; nunca `float`.
+- **`porcentaje_fiscal` está obsoleto.** Sus valores se copiaron (dividido por 100) al esquema `GENERAL` de cada edificio, como borrador. La pantalla de Unidades lo muestra en solo lectura; la columna se retira en un sprint posterior.
+
+Las pruebas del modelo (incluidos los casos de aceptación de DOMUYO, MANGRULLO y TORRE PILARES) corren en una copia en memoria de la base, sin tocar Supabase:
+
+```bash
+pnpm test:db
+```
 
 ## Perfil, contactos y datos del consorcio
 
@@ -170,5 +188,6 @@ Antes de publicar:
 2. Ejecuta `pnpm lint` y `pnpm build`.
 3. Despliega la Edge Function `admin-users`.
 4. Ejecuta las migraciones de Supabase.
-5. Revisa la configuración de correos y enlaces de la sección "Cuentas" (SMTP, plantillas, Redirect URLs).
-6. Proba RLS con usuarios de distintos edificios, un usuario sin unidad y una cuenta pendiente de aprobación.
+5. Si hay migraciones nuevas, corre `pnpm test:db` antes de aplicarlas.
+6. Revisa la configuración de correos y enlaces de la sección "Cuentas" (SMTP, plantillas, Redirect URLs).
+7. Proba RLS con usuarios de distintos edificios, un usuario sin unidad y una cuenta pendiente de aprobación.

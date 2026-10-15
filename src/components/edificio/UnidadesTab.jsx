@@ -4,7 +4,12 @@ import supabase from "../../supabase-client";
 import ConfirmDialog from "../ConfirmDialog";
 import ModalForm, { ModalFormButton } from "../ModalForm";
 import AsignarUsuarioForm from "./AsignarUsuarioForm";
+import { fetchCoeficienteGeneral } from "../../services/coeficientes";
 import { fetchUsuariosPorIds } from "../../services/usuarios";
+import {
+  formatearPorcentaje,
+  sumarCoeficientes,
+} from "../../utils/coeficientes";
 import { asignacionVigente, hoy } from "../../utils/fechas";
 import { mensajeDeError } from "../../utils/supabase-errors";
 
@@ -22,9 +27,6 @@ const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50 disabled:text-stone-400";
 const labelClass = "mb-1 block text-sm font-medium text-stone-700";
 const asignacionActiva = (a) => asignacionVigente(a);
-
-// Evita ruido de coma flotante al sumar porcentajes (33.33 + 33.33 + 33.34).
-const redondear = (numero) => Math.round(numero * 100) / 100;
 
 // Supabase puede devolver una relación embebida como objeto único en vez de
 // array si detecta (a veces por error, ej. una restricción UNIQUE mal puesta
@@ -75,8 +77,19 @@ async function cargarAsignados(unidades) {
   }
 }
 
+async function cargarCoeficienteGeneral(edificioId) {
+  try {
+    return await fetchCoeficienteGeneral(edificioId);
+  } catch (error) {
+    console.error("No se pudo cargar el coeficiente general", error);
+    return null;
+  }
+}
+
 export default function UnidadesTab({ edificioId }) {
   const [unidades, setUnidades] = useState(null);
+  // { esquema, valores } del esquema GENERAL vigente; null si no se pudo leer.
+  const [general, setGeneral] = useState(null);
   const [unidadesError, setUnidadesError] = useState(null);
   const [usuariosAsignados, setUsuariosAsignados] = useState([]);
 
@@ -85,7 +98,6 @@ export default function UnidadesTab({ edificioId }) {
   const [piso, setPiso] = useState("");
   const [tipo, setTipo] = useState("departamento");
   const [superficieM2, setSuperficieM2] = useState("");
-  const [porcentajeFiscal, setPorcentajeFiscal] = useState("");
   const [creandoUnidad, setCreandoUnidad] = useState(false);
   const [unidadFormError, setUnidadFormError] = useState(null);
   const [unidadCreadaOk, setUnidadCreadaOk] = useState(false);
@@ -105,7 +117,6 @@ export default function UnidadesTab({ edificioId }) {
 
   const [editandoId, setEditandoId] = useState(null);
   const [editIdentificador, setEditIdentificador] = useState("");
-  const [editPorcentaje, setEditPorcentaje] = useState("");
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
   const [editError, setEditError] = useState(null);
 
@@ -119,16 +130,15 @@ export default function UnidadesTab({ edificioId }) {
     [unidades],
   );
 
-  const totalPorcentajeFiscal = redondear(
-    (unidades || []).reduce(
-      (acc, u) => acc + (u.porcentaje_fiscal ? Number(u.porcentaje_fiscal) : 0),
-      0,
-    ),
+  const identificadorPorId = useMemo(
+    () =>
+      Object.fromEntries((unidades ?? []).map((u) => [u.id, u.identificador])),
+    [unidades],
   );
-  const disponiblePorcentajeFiscal = Math.max(
-    0,
-    redondear(100 - totalPorcentajeFiscal),
-  );
+  const sumaGeneral = sumarCoeficientes(general?.valores);
+  const generalCierra =
+    general?.esquema &&
+    Math.abs(sumaGeneral - 1) <= Number(general.esquema.tolerancia);
 
   useEffect(() => {
     async function cargar() {
@@ -138,6 +148,7 @@ export default function UnidadesTab({ edificioId }) {
       if (unError) setUnidadesError(mensajeDeError(unError));
       setUnidades(unidadesData || []);
       setUsuariosAsignados(await cargarAsignados(unidadesData));
+      setGeneral(await cargarCoeficienteGeneral(edificioId));
     }
     cargar();
   }, [edificioId]);
@@ -159,19 +170,12 @@ export default function UnidadesTab({ edificioId }) {
     setUnidadesError(null);
     setUnidades(data);
     setUsuariosAsignados(await cargarAsignados(data));
+    setGeneral(await cargarCoeficienteGeneral(edificioId));
   }
 
   async function handleCrearUnidad(e) {
     e.preventDefault();
     setUnidadFormError(null);
-
-    const nuevoPorcentaje = porcentajeFiscal ? Number(porcentajeFiscal) : 0;
-    if (redondear(totalPorcentajeFiscal + nuevoPorcentaje) > 100) {
-      setUnidadFormError(
-        `El % fiscal ingresado (${nuevoPorcentaje}%) supera el disponible (${disponiblePorcentajeFiscal}%). Ya hay ${totalPorcentajeFiscal}% asignado en este edificio.`,
-      );
-      return;
-    }
 
     setCreandoUnidad(true);
 
@@ -181,7 +185,6 @@ export default function UnidadesTab({ edificioId }) {
       piso: piso || null,
       tipo,
       superficie_m2: superficieM2 ? Number(superficieM2) : null,
-      porcentaje_fiscal: Number(porcentajeFiscal || 0),
     });
 
     setCreandoUnidad(false);
@@ -204,14 +207,12 @@ export default function UnidadesTab({ edificioId }) {
       setPiso("");
       setTipo("departamento");
       setSuperficieM2("");
-      setPorcentajeFiscal("");
     }, 1400);
   }
 
   function empezarEdicion(unidad) {
     setEditandoId(unidad.id);
     setEditIdentificador(unidad.identificador);
-    setEditPorcentaje(String(unidad.porcentaje_fiscal ?? 0));
     setEditError(null);
   }
 
@@ -220,33 +221,15 @@ export default function UnidadesTab({ edificioId }) {
     setEditError(null);
 
     const nuevoIdentificador = editIdentificador.trim();
-    const nuevoPorcentaje = Number(editPorcentaje);
     if (!nuevoIdentificador) {
       setEditError("El nombre de la unidad no puede quedar vacío.");
-      return;
-    }
-    if (!Number.isFinite(nuevoPorcentaje) || nuevoPorcentaje < 0) {
-      setEditError("Ingresá un porcentaje válido.");
-      return;
-    }
-    // Lo que suman las demás unidades: la que se edita no cuenta contra sí misma.
-    const otras = redondear(
-      totalPorcentajeFiscal - Number(unidad.porcentaje_fiscal || 0),
-    );
-    if (redondear(otras + nuevoPorcentaje) > 100) {
-      setEditError(
-        `El % fiscal ingresado (${nuevoPorcentaje}%) supera el disponible (${redondear(100 - otras)}%). Las otras unidades suman ${otras}%.`,
-      );
       return;
     }
 
     setGuardandoEdicion(true);
     const { error } = await supabase
       .from("unidad_funcional")
-      .update({
-        identificador: nuevoIdentificador,
-        porcentaje_fiscal: nuevoPorcentaje,
-      })
+      .update({ identificador: nuevoIdentificador })
       .eq("id", unidad.id)
       .select("id")
       .single();
@@ -347,19 +330,38 @@ export default function UnidadesTab({ edificioId }) {
           <h2 className="text-lg font-semibold text-stone-900">
             Unidades funcionales
           </h2>
-          <p className="mt-0.5 text-sm text-stone-500">
-            % fiscal asignado:{" "}
-            <span
-              className={
-                totalPorcentajeFiscal >= 100
-                  ? "font-semibold text-green-700"
-                  : "font-semibold text-stone-700"
-              }
-            >
-              {totalPorcentajeFiscal}%
-            </span>{" "}
-            de 100%
-          </p>
+          {general?.esquema ? (
+            <p className="mt-0.5 text-sm text-stone-500">
+              Coeficiente general:{" "}
+              <span
+                className={
+                  generalCierra
+                    ? "font-semibold text-green-700"
+                    : "font-semibold text-stone-700"
+                }
+              >
+                {formatearPorcentaje(sumaGeneral)}
+              </span>{" "}
+              de 100%
+              <span
+                className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+                  general.esquema.estado === "publicado"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {general.esquema.estado === "publicado"
+                  ? "Publicado"
+                  : "Borrador"}
+              </span>
+            </p>
+          ) : (
+            general && (
+              <p className="mt-0.5 text-sm text-stone-500">
+                Todavía no hay coeficientes cargados para este edificio.
+              </p>
+            )
+          )}
         </div>
         <button
           type="button"
@@ -381,7 +383,7 @@ export default function UnidadesTab({ edificioId }) {
         successTitle="¡Unidad creada!"
         successMessage={`${identificador} ya está en la lista de unidades.`}
         title="Nueva unidad"
-        description={`% fiscal disponible para repartir: ${disponiblePorcentajeFiscal}%.`}
+        description="Los coeficientes de prorrateo se cargan aparte, no acá."
       >
         <form onSubmit={handleCrearUnidad} className="space-y-4">
           <div className="flex gap-3">
@@ -430,45 +432,25 @@ export default function UnidadesTab({ edificioId }) {
               <option value="cochera">Cochera</option>
               <option value="baulera">Baulera</option>
               <option value="local">Local</option>
+              <option value="oficina">Oficina</option>
+              <option value="otro">Otro</option>
             </select>
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label htmlFor="superficieM2" className={labelClass}>
-                Superficie (m²)
-              </label>
-              <input
-                id="superficieM2"
-                type="number"
-                min="0"
-                step="0.01"
-                value={superficieM2}
-                onChange={(e) => setSuperficieM2(e.target.value)}
-                disabled={creandoUnidad}
-                className={inputClass}
-              />
-            </div>
-            <div className="flex-1">
-              <label htmlFor="porcentajeFiscal" className={labelClass}>
-                % fiscal{" "}
-                <span className="font-normal text-stone-400">
-                  (disponible: {disponiblePorcentajeFiscal}%)
-                </span>
-              </label>
-              <input
-                id="porcentajeFiscal"
-                type="number"
-                required
-                min="0"
-                max={disponiblePorcentajeFiscal}
-                step="0.01"
-                value={porcentajeFiscal}
-                onChange={(e) => setPorcentajeFiscal(e.target.value)}
-                disabled={creandoUnidad}
-                className={inputClass}
-              />
-            </div>
+          <div>
+            <label htmlFor="superficieM2" className={labelClass}>
+              Superficie (m²)
+            </label>
+            <input
+              id="superficieM2"
+              type="number"
+              min="0"
+              step="0.01"
+              value={superficieM2}
+              onChange={(e) => setSuperficieM2(e.target.value)}
+              disabled={creandoUnidad}
+              className={inputClass}
+            />
           </div>
 
           <ModalFormButton
@@ -514,12 +496,16 @@ export default function UnidadesTab({ edificioId }) {
             asignacionActiva,
           );
           const editando = editandoId === u.id;
-          const maximoEdicion = Math.max(
-            0,
-            redondear(
-              100 - (totalPorcentajeFiscal - Number(u.porcentaje_fiscal || 0)),
-            ),
-          );
+          const coeficiente = general?.valores?.[u.id];
+          const detalle = [
+            u.superficie_m2 ? `${u.superficie_m2} m²` : null,
+            coeficiente != null
+              ? `${formatearPorcentaje(coeficiente)} coef. general`
+              : null,
+            u.unidad_principal_id
+              ? `anexa a ${identificadorPorId[u.unidad_principal_id] ?? "otra unidad"}`
+              : null,
+          ].filter(Boolean);
           return (
             <div
               key={u.id}
@@ -547,29 +533,6 @@ export default function UnidadesTab({ edificioId }) {
                         required
                         value={editIdentificador}
                         onChange={(e) => setEditIdentificador(e.target.value)}
-                        disabled={guardandoEdicion}
-                        className={inputClass}
-                      />
-                    </div>
-                    <div className="w-40 shrink-0">
-                      <label
-                        htmlFor={`edit-porcentaje-${u.id}`}
-                        className={labelClass}
-                      >
-                        % fiscal{" "}
-                        <span className="font-normal text-stone-400">
-                          (máx. {maximoEdicion}%)
-                        </span>
-                      </label>
-                      <input
-                        id={`edit-porcentaje-${u.id}`}
-                        type="number"
-                        required
-                        min="0"
-                        max={maximoEdicion}
-                        step="0.01"
-                        value={editPorcentaje}
-                        onChange={(e) => setEditPorcentaje(e.target.value)}
                         disabled={guardandoEdicion}
                         className={inputClass}
                       />
@@ -613,13 +576,9 @@ export default function UnidadesTab({ edificioId }) {
                           : ""}
                       </span>
                     </p>
-                    {(u.superficie_m2 || u.porcentaje_fiscal) && (
+                    {detalle.length > 0 && (
                       <p className="text-xs text-stone-400">
-                        {u.superficie_m2 ? `${u.superficie_m2} m²` : ""}
-                        {u.superficie_m2 && u.porcentaje_fiscal ? " · " : ""}
-                        {u.porcentaje_fiscal
-                          ? `${u.porcentaje_fiscal}% fiscal`
-                          : ""}
+                        {detalle.join(" · ")}
                       </p>
                     )}
                   </div>
