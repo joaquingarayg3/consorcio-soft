@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import AuthLayout from "../components/AuthLayout";
+import Captcha from "../components/Captcha";
 import {
   Alerta,
   BotonPrincipal,
@@ -11,6 +12,7 @@ import {
 } from "../components/CamposAuth";
 import { useEnfriamiento } from "../hooks/useEnfriamiento";
 import { registrarCuenta, reenviarVerificacion } from "../services/cuenta";
+import { CAPTCHA_ACTIVO, MENSAJE_CAPTCHA_FALTA } from "../utils/captcha";
 import {
   NOMBRE_MAX,
   PASSWORD_MAX,
@@ -29,12 +31,19 @@ function RevisaTuCorreo({ email }) {
   const [reenviando, setReenviando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [restante, iniciarEnfriamiento] = useEnfriamiento(60);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const captcha = useRef(null);
 
   async function handleReenviar() {
+    if (CAPTCHA_ACTIVO && !captchaToken) {
+      setResultado({ tipo: "error", texto: MENSAJE_CAPTCHA_FALTA });
+      return;
+    }
     setReenviando(true);
     setResultado(null);
-    const respuesta = await reenviarVerificacion(email);
+    const respuesta = await reenviarVerificacion(email, captchaToken);
     setReenviando(false);
+    captcha.current?.reiniciar();
     if (respuesta.ok) {
       iniciarEnfriamiento();
       setResultado({ tipo: "exito", texto: "Listo, te lo mandamos de nuevo." });
@@ -82,6 +91,7 @@ function RevisaTuCorreo({ email }) {
       </p>
 
       <div className="space-y-2">
+        <Captcha ref={captcha} onToken={setCaptchaToken} />
         <BotonSecundario
           onClick={handleReenviar}
           disabled={reenviando || restante > 0}
@@ -114,6 +124,8 @@ export default function CrearCuenta() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
   const [enviadoA, setEnviadoA] = useState(null);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const captcha = useRef(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -132,6 +144,11 @@ export default function CrearCuenta() {
       return;
     }
 
+    if (CAPTCHA_ACTIVO && !captchaToken) {
+      setError(MENSAJE_CAPTCHA_FALTA);
+      return;
+    }
+
     setEnviando(true);
     setError(null);
     const resultado = await registrarCuenta({
@@ -140,8 +157,11 @@ export default function CrearCuenta() {
       email,
       unidad,
       contrasena,
+      captchaToken,
     });
     setEnviando(false);
+    // Cada token sirve para un solo intento.
+    captcha.current?.reiniciar();
 
     if (!resultado.ok) {
       setError(resultado.error);
@@ -252,6 +272,8 @@ export default function CrearCuenta() {
               disabled={enviando}
               invalido={repeticion !== "" && repeticion !== contrasena}
             />
+
+            <Captcha ref={captcha} onToken={setCaptchaToken} />
 
             {error && <Alerta id="registro-error">{error}</Alerta>}
 

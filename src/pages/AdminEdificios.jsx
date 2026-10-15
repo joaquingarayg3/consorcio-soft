@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import supabase from "../supabase-client";
 import AppHeader from "../components/AppHeader";
 import ModalForm, { ModalFormButton } from "../components/ModalForm";
+import CamposFiscales from "../components/edificio/CamposFiscales";
+import { FISCALES_VACIOS, validarFiscales } from "../utils/edificio";
 import { mensajeDeError } from "../utils/supabase-errors";
 import ImagenEdificio from "../components/ImagenEdificio";
 import { useUrlsFotos } from "../hooks/useUrlsFotos";
@@ -223,9 +225,7 @@ export default function AdminEdificios() {
   // null = se usa la sugerencia según el nombre; si la persona escribe, manda lo suyo.
   const [codigoManual, setCodigoManual] = useState(null);
   const [direccion, setDireccion] = useState("");
-  const [ciudad, setCiudad] = useState("");
-  const [provincia, setProvincia] = useState("");
-  const [codigoPostal, setCodigoPostal] = useState("");
+  const [fiscales, setFiscales] = useState(FISCALES_VACIOS);
   const [creando, setCreando] = useState(false);
   const [formError, setFormError] = useState(null);
   const [creadoOk, setCreadoOk] = useState(false);
@@ -303,15 +303,18 @@ export default function AdminEdificios() {
       setFormError("El código tiene que tener entre 2 y 5 letras o números.");
       return;
     }
+    const revision = validarFiscales(fiscales);
+    if (revision.error) {
+      setFormError(revision.error);
+      return;
+    }
     setCreando(true);
 
     const { error } = await supabase.from("edificio").insert({
       nombre,
       codigo: codigoFinal,
       direccion,
-      ciudad: ciudad || null,
-      provincia: provincia.trim(),
-      codigo_postal: codigoPostal || null,
+      ...revision.datos,
     });
 
     setCreando(false);
@@ -335,9 +338,7 @@ export default function AdminEdificios() {
       setNombre("");
       setCodigoManual(null);
       setDireccion("");
-      setCiudad("");
-      setProvincia("");
-      setCodigoPostal("");
+      setFiscales(FISCALES_VACIOS);
     }, 1400);
   }
 
@@ -424,48 +425,14 @@ export default function AdminEdificios() {
               />
             </div>
 
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label htmlFor="ciudad" className={labelClass}>
-                  Ciudad
-                </label>
-                <input
-                  id="ciudad"
-                  type="text"
-                  value={ciudad}
-                  onChange={(e) => setCiudad(e.target.value)}
-                  disabled={creando}
-                  className={inputClass}
-                />
-              </div>
-              <div className="flex-1">
-                <label htmlFor="provincia" className={labelClass}>
-                  Provincia
-                </label>
-                <input
-                  id="provincia"
-                  type="text"
-                  required
-                  value={provincia}
-                  onChange={(e) => setProvincia(e.target.value)}
-                  disabled={creando}
-                  className={inputClass}
-                />
-              </div>
-              <div className="w-32 shrink-0">
-                <label htmlFor="codigoPostal" className={labelClass}>
-                  C.P.
-                </label>
-                <input
-                  id="codigoPostal"
-                  type="text"
-                  value={codigoPostal}
-                  onChange={(e) => setCodigoPostal(e.target.value)}
-                  disabled={creando}
-                  className={inputClass}
-                />
-              </div>
-            </div>
+            <CamposFiscales
+              prefijo="alta"
+              valores={fiscales}
+              onCambiar={(campo, valor) =>
+                setFiscales((actuales) => ({ ...actuales, [campo]: valor }))
+              }
+              disabled={creando}
+            />
 
             <ModalFormButton
               loading={creando}

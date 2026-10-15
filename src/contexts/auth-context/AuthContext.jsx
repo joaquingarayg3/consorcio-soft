@@ -135,11 +135,12 @@ export function AuthContextProvider({ children }) {
     };
   }, [idSesion, loadPerfil]);
 
-  const singInUser = async (email, password) => {
+  const singInUser = async (email, password, captchaToken) => {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: password,
+        options: { captchaToken },
       });
       // Credenciales incorrectas o cuenta dada de baja: el mensaje ya se
       // muestra en el formulario, no es un error de la aplicación.

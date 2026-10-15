@@ -18,6 +18,8 @@ const POR_CODIGO = {
   signup_disabled: "Por ahora no se pueden crear cuentas nuevas.",
   captcha_failed: "No pudimos verificar que no sos un robot. Intentá de nuevo.",
   session_not_found: "Tu sesión venció. Volvé a iniciar sesión.",
+  reauthentication_needed:
+    "Por seguridad, cerrá sesión, volvé a entrar y probá de nuevo.",
 };
 
 // Para versiones de Supabase que todavía no mandan `code`.
@@ -38,6 +40,7 @@ const POR_TEXTO = [
   ["invalid format", "email_address_invalid"],
   ["unable to validate email", "email_address_invalid"],
   ["signups not allowed", "signup_disabled"],
+  ["reauthentication", "reauthentication_needed"],
 ];
 
 const SIN_CONEXION =

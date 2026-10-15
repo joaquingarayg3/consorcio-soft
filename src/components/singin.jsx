@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "../contexts/auth-context/use-auth";
 import { useEnfriamiento } from "../hooks/useEnfriamiento";
 import { reenviarVerificacion } from "../services/cuenta";
+import { CAPTCHA_ACTIVO, MENSAJE_CAPTCHA_FALTA } from "../utils/captcha";
 import AuthLayout from "./AuthLayout";
+import Captcha from "./Captcha";
 import {
   Alerta,
   BotonPrincipal,
@@ -25,10 +27,16 @@ export default function Singin() {
   const [reenvio, setReenvio] = useState(null);
   const [reenviando, setReenviando] = useState(false);
   const [restante, iniciarEnfriamiento] = useEnfriamiento(60);
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const captcha = useRef(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (enviando) return;
+    if (CAPTCHA_ACTIVO && !captchaToken) {
+      setError(MENSAJE_CAPTCHA_FALTA);
+      return;
+    }
     setEnviando(true);
     setError(null);
     setReenvio(null);
@@ -39,8 +47,10 @@ export default function Singin() {
       data,
       error: singInError,
       codigo,
-    } = await singInUser(email, password);
+    } = await singInUser(email, password, captchaToken);
     setEnviando(false);
+    // Cada token sirve para un solo intento.
+    captcha.current?.reiniciar();
 
     if (singInError) {
       setError(singInError);
@@ -53,10 +63,15 @@ export default function Singin() {
   }
 
   async function handleReenviar() {
+    if (CAPTCHA_ACTIVO && !captchaToken) {
+      setReenvio({ tipo: "error", texto: MENSAJE_CAPTCHA_FALTA });
+      return;
+    }
     setReenviando(true);
     setReenvio(null);
-    const resultado = await reenviarVerificacion(email);
+    const resultado = await reenviarVerificacion(email, captchaToken);
     setReenviando(false);
+    captcha.current?.reiniciar();
     if (resultado.ok) {
       iniciarEnfriamiento();
       setReenvio({
@@ -121,6 +136,8 @@ export default function Singin() {
             </Link>
           </p>
         </div>
+
+        <Captcha ref={captcha} onToken={setCaptchaToken} />
 
         <BotonPrincipal
           cargando={enviando}

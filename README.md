@@ -80,6 +80,11 @@ Las migraciones de `supabase/migrations` se aplican en el orden de su número de
 | `20261013120000_inicio_vecino.sql` | Anuncios urgentes (`anuncios.urgente_hasta`), código de cada edificio (`edificio.codigo`, único, ej. `HP`) y número de reclamo por edificio (`reclamos.numero`, asignado por la base; el ticket se muestra `HP-0012`). Numera los reclamos ya existentes por orden de creación y les sugiere un código a los edificios actuales. **Hay que aplicarla antes de usar la versión nueva de la app.** |
 | `20261014120000_foto_edificio.sql` | Foto de cada edificio: columnas `foto_path`, `miniatura_path` y `foto_actualizada_en` en `edificio`, y el bucket privado `edificios` (la ven administradores y vecinos de ese edificio; solo administradores suben o borran). |
 | `20261015120000_registro_vecinos.sql` | Registro autónomo con aprobación: el perfil se crea **al verificar el correo**, siempre como pendiente (`activo = false`, `aprobado_en` vacío) y con rol `user`. Agrega `perfiles.aprobado_en` y `perfiles.unidad_declarada`, reemplaza el trigger anterior que creaba el perfil al registrarse, hace que una cuenta inactiva no vea nada del consorcio aunque tenga unidad (`usuario_en_unidad` / `usuario_en_edificio`), agrega el estado "pendientes" a `buscar_perfiles` y la función de limpieza `purgar_cuentas_sin_verificar`. Los perfiles que ya existían quedan como aprobados. **Requiere volver a desplegar la función `admin-users`** (activa y aprueba a quien crea un admin). |
+| `20261021120000_nombres_en_reclamos.sql` | Nombres a la vista en reclamos y comentarios: columnas `autor_nombre`, `autor_unidad`, `autor_es_admin` (comentarios) y `reportante_nombre`, `reportante_es_admin` (reclamos), que fijan triggers de la base al crear la fila (el cliente no puede escribirlas ni cambiarlas después). Completa lo existente y redefine `eliminar_usuario_definitivo` para borrar esas copias (también en el historial). |
+| `20261020120000_borrar_reclamos_cerrados.sql` | Borrado de reclamos cerrados (solo administración): función `eliminar_reclamo_cerrado(reclamo)` que borra el reclamo con sus comentarios, notificaciones e historial y devuelve las rutas de sus fotos; la política de borrado exige `estado = 'cerrado'`; el trigger de historial deja de intentar registrar el borrado (antes hacía fallar todo borrado). El número de ticket no se reutiliza. |
+| `20261019120000_nueva_version_esquema.sql` | Función `nueva_version_esquema(esquema, fecha)`: cierra la vigencia de un esquema publicado, crea la versión nueva en borrador con sus participantes y valores copiados (un derivado pasa a derivar de la versión de su base que rige en esa fecha), todo en una sola operación. |
+| `20261018120000_coeficientes.sql` | Modelo de coeficientes de prorrateo (ver "Coeficientes de prorrateo" más abajo): tablas `esquema_coeficiente` y `coeficiente`, vista `v_coeficiente_por_cuenta`, funciones `crear_esquema`, `guardar_coeficientes`, `recalcular_esquema`, `validar_esquema`, `publicar_esquema` y `despublicar_esquema`, y en `unidad_funcional`: `numero_uf`, `unidad_principal_id` (anexas), tipos admitidos (departamento, cochera, local, baulera, oficina, otro) y `edificio_id` obligatorio. Migra el `porcentaje_fiscal` actual al esquema `GENERAL` de cada edificio (como borrador). **Falla si hay unidades sin edificio.** |
+| `20261017120000_perfil_y_contactos.sql` | Datos fiscales y bancarios del edificio (`cuit`, `banco`, `titular_cuenta`, `cbu`, `alias_cbu`, con restricciones de formato; los ven los administradores y los vecinos de ese edificio, que es lo que ya permite la política de lectura de `edificio`), ciudad/provincia/código postal pasan a ser opcionales, tabla `edificio_contactos` (nombre y teléfono; los ven los vecinos del edificio y solo los administradores la modifican) y límite de columnas editables en `perfiles` (`nombre`, `apellido`, `telefono` y `rol`: antes la API dejaba modificar cualquier columna que el trigger no protegiera, como `created_at`). |
 | `20261016120000_imagenes_solo_cuentas_activas.sql` | Subir imágenes de reclamos pasa a exigir cuenta activa (crea `private.cuenta_activa()`): con el registro público, una cuenta pendiente ya no puede ocupar almacenamiento. |
 
 Para aplicar migraciones nuevas, vinculá el proyecto una sola vez (pide la contraseña de la base) y después hacé push:
@@ -104,6 +109,40 @@ Las tablas base (`perfiles`, `edificio`, `unidad_funcional`, `unidad_usuarios`, 
 
 `supabase/auditoria_seguridad.sql` es una consulta de solo lectura que muestra el estado de RLS, políticas, funciones y buckets. Sirve para revisar que nada haya cambiado.
 
+## Coeficientes de prorrateo
+
+Cada edificio reparte sus gastos con uno o más **esquemas** de coeficientes; cada esquema es una bolsa de gasto que reparte el 100% (valor 1) entre las unidades que **tienen fila** en él (quien no tiene fila no paga esa bolsa).
+
+- **Unidades.** Cocheras, bauleras y locales son unidades (`unidad_funcional`). Una cochera o baulera que se liquida con un departamento se carga como unidad aparte con `unidad_principal_id`; `v_coeficiente_por_cuenta` suma cada cuenta (principal + anexas). Si la planilla trae dpto + cochera con un único coeficiente inseparable, se carga una sola unidad.
+- **Métodos.** `manual` (valor cargado), `derivado` (valor = coeficiente en el esquema base / suma de los participantes) y `partes_iguales` (peso / suma de pesos). Los derivados y las partes iguales se **guardan calculados**; `recalcular_esquema` los actualiza en cascada.
+- **Estados.** Un esquema nace en `borrador` (se guarda aunque no cierre). `publicar_esquema` recalcula, exige que sume 1 dentro de la **tolerancia propia del esquema** (por defecto ±0,0001) y lo publica; un derivado solo se publica si su base ya está publicada. Lo publicado no se edita: `despublicar_esquema` o, si cambia el reglamento, un esquema nuevo con otra vigencia (`vigente_desde` / `vigente_hasta`; dos vigencias del mismo código no pueden superponerse).
+- **Seguridad.** Solo la administración lee y escribe estas tablas (RLS). Las funciones corren con los permisos de quien las llama.
+- **Precisión.** `numeric(12,10)`; nunca `float`.
+- **`porcentaje_fiscal` está obsoleto.** Sus valores se copiaron (dividido por 100) al esquema `GENERAL` de cada edificio, como borrador. La pantalla de Unidades lo muestra en solo lectura; la columna se retira en un sprint posterior.
+
+**Pantalla (pestaña "Coeficientes" de cada edificio):**
+
+- La lista muestra cada esquema con su método, estado (borrador o publicado), vigencia (vigente, futuro o anterior), cuántas unidades participan y cuánto suman. Desde ahí se crea un esquema nuevo, se elimina un borrador o se crea una nueva versión.
+- El editor de un esquema (`/coeficientes?esquema=ID`) tiene una fila por unidad con su casillero para participar y su valor en **porcentaje** (6,46). En los derivados y de partes iguales el valor se calcula solo y se ve al instante; la base de datos vuelve a calcularlo al guardar y es la que manda. La barra de abajo muestra lo que suma y si cierra dentro de la tolerancia.
+- **Pegar desde Excel:** se pegan dos columnas (unidad y valor); se cruzan por el nombre de la unidad (o su número de UF) y se muestra qué no se encontró antes de aplicar. Solo completa la tabla: hay que guardar.
+- **Guardar borrador** no exige que sume 100%; **Publicar** guarda, valida y publica. Un publicado se lee pero no se edita: se **despublica** (error de carga) o se crea una **nueva versión** (cambió el reglamento).
+- En Unidades, al editar una cochera o baulera se elige a qué departamento está anexa y, opcionalmente, su número de UF.
+
+Las pruebas del modelo (incluidos los casos de aceptación de DOMUYO, MANGRULLO y TORRE PILARES) corren en una copia en memoria de la base, sin tocar Supabase:
+
+```bash
+pnpm test:db
+```
+
+## Perfil, contactos y datos del consorcio
+
+- **Mi perfil** (`/perfil`, desde el menú del avatar): cada persona edita su nombre, apellido y teléfono, y cambia su contraseña (se cierran sus otras sesiones). El correo no se edita desde la app: es el de acceso, y cambiarlo requiere reverificarlo.
+- **Edificio**: al crearlo se piden nombre, código, dirección y, opcionalmente, CUIT y datos bancarios (banco, titular, CBU de 22 dígitos y alias). El CUIT se valida con su dígito verificador. Ciudad, provincia y código postal se completan, si se quiere, en la pestaña Datos.
+- **Contactos** (pestaña del edificio, solo administración): nombre y teléfono, por ejemplo "Mantenimiento ascensor".
+- **Botón del teléfono** (cabecera, junto a la campanita, solo vecinos con unidad vigente): abre los contactos de cada uno de sus edificios, con enlace para llamar, y los datos del consorcio (CUIT, CBU y alias con botón de copiar).
+
+El CUIT y los datos bancarios los puede leer **cualquier vecino con una unidad vigente en ese edificio** (y los administradores), no se guardan en una tabla aparte. Si algún día se quisiera que fueran solo para administración, habría que moverlos a una tabla con su propia política.
+
 ## Cuentas: registro, verificación y recuperación
 
 Flujo de una persona nueva:
@@ -126,8 +165,24 @@ Sin esto, los correos no llegan o los enlaces no funcionan:
 2. **Authentication → URL Configuration**: *Site URL* = el dominio de producción. En *Redirect URLs* agregar (con tu dominio real) `https://TU-DOMINIO/confirmar`, `https://TU-DOMINIO/restablecer` y, para desarrollo, `http://localhost:5173/confirmar` y `http://localhost:5173/restablecer`.
 3. **Authentication → Emails → SMTP Settings**: SMTP propio con Resend (host `smtp.resend.com`, puerto `465`, usuario `resend`, contraseña = API key de Resend, remitente de tu dominio verificado, por ejemplo `no-responder@tudominio.com`). Con el servicio de correo por defecto de Supabase solo reciben mails los miembros del equipo y hay un límite muy bajo.
 4. **Authentication → Emails → Templates**: pegar el HTML de `supabase/email-templates/` en **Confirm signup** (`confirmar-cuenta.html`, asunto sugerido "Verificá tu correo — SMPH") y **Reset password** (`restablecer-contrasena.html`, asunto "Elegí una contraseña nueva — SMPH"). Los enlaces usan `{{ .RedirectTo }}`, que la app envía al pedir el correo. No agregues datos que escribe el usuario (como su nombre) a las plantillas: sería posible inyectar texto en un correo que sale de tu dominio.
-5. **Authentication → Rate Limits**: revisar el límite de correos por hora y de registros por IP. Para frenar registros automáticos, activar **Attack Protection → CAPTCHA** (Cloudflare Turnstile o hCaptcha); hoy la app no lo usa, así que primero habría que agregarlo al formulario.
+5. **Authentication → Rate Limits**: revisar el límite de correos por hora y de registros por IP. Para frenar registros automáticos, usar el CAPTCHA (sección siguiente).
 6. Desplegar la Edge Function `admin-users` y aplicar la migración `20261015120000_registro_vecinos.sql`.
+
+### CAPTCHA (Cloudflare Turnstile, gratis)
+
+Frena los registros automáticos. La app lo trae listo y **se activa solo cuando hay clave pública**: sin `VITE_TURNSTILE_SITE_KEY` no se carga nada de Cloudflare y los formularios funcionan como siempre. Casi siempre se resuelve solo, sin que la persona haga nada.
+
+Supabase aplica el CAPTCHA a **registro, inicio de sesión y recuperación de contraseña a la vez** (no se puede elegir uno), por eso los tres formularios, y los botones de reenviar correo, mandan el token.
+
+**El orden importa.** Si se activa en Supabase antes de que la app publicada mande el token, **nadie puede iniciar sesión, administradores incluidos**. Orden seguro:
+
+1. En Cloudflare (Turnstile → Add widget): crear un widget en modo **Managed**, con los dominios `consorcio-soft.vercel.app` y `localhost`. Copiar la *Site Key* (pública) y la *Secret Key*.
+2. En Vercel (Settings → Environment Variables): `VITE_TURNSTILE_SITE_KEY` = la Site Key, y volver a desplegar. Esta variable se incorpora al compilar, así que sin nuevo despliegue no tiene efecto.
+3. Verificar en el sitio publicado que el formulario sigue funcionando (todavía sin exigirlo).
+4. En Supabase → Authentication → Attack Protection (o *Bot and Abuse Protection*): activar CAPTCHA, elegir Turnstile y pegar la **Secret Key**. La clave secreta va solo ahí, nunca en el repositorio ni en Vercel.
+5. Probar de nuevo registro, inicio de sesión y recuperación. Si algo falla, **desactivar el CAPTCHA en Supabase** devuelve todo al estado anterior al instante.
+
+Para desarrollo local, poné la misma Site Key en un `.env.local` (el widget incluye `localhost`). Las claves de prueba de Cloudflare (como `1x00000000000000000000AA`, que siempre aprueba) solo sirven mientras el CAPTCHA esté **desactivado** en Supabase: con la clave secreta real activada, Supabase rechaza sus tokens de mentira.
 
 Las cuentas que se registran y nunca verifican su correo no tienen perfil (no aparecen en Usuarios) pero ocupan lugar en Supabase Auth. Para borrarlas pasados 7 días, ejecutá en el SQL Editor `select public.purgar_cuentas_sin_verificar(7);` o programalo con pg_cron:
 
@@ -144,5 +199,6 @@ Antes de publicar:
 2. Ejecuta `pnpm lint` y `pnpm build`.
 3. Despliega la Edge Function `admin-users`.
 4. Ejecuta las migraciones de Supabase.
-5. Revisa la configuración de correos y enlaces de la sección "Cuentas" (SMTP, plantillas, Redirect URLs).
-6. Proba RLS con usuarios de distintos edificios, un usuario sin unidad y una cuenta pendiente de aprobación.
+5. Si hay migraciones nuevas, corre `pnpm test:db` antes de aplicarlas.
+6. Revisa la configuración de correos y enlaces de la sección "Cuentas" (SMTP, plantillas, Redirect URLs).
+7. Proba RLS con usuarios de distintos edificios, un usuario sin unidad y una cuenta pendiente de aprobación.

@@ -472,6 +472,31 @@ export async function updateClaimPriority(claimId, priority) {
   return data;
 }
 
+// Borra un reclamo cerrado con sus comentarios, notificaciones e historial (lo
+// hace la base de datos, solo para la administración) y después quita sus fotos
+// del almacenamiento. Si las fotos no se pueden quitar, el reclamo ya está
+// borrado: se avisa con `fotosSinBorrar` en vez de fallar.
+export async function deleteClosedClaim(claimId) {
+  if (isDemoMode()) {
+    saveStoredClaims(getStoredClaims().filter((claim) => claim.id !== claimId));
+    return { fotosSinBorrar: 0 };
+  }
+
+  const { data, error } = await supabase.rpc("eliminar_reclamo_cerrado", {
+    p_reclamo: claimId,
+  });
+  if (error) throw error;
+
+  const paths = (Array.isArray(data) ? data : [])
+    .map(storagePathFromImage)
+    .filter(Boolean);
+  if (!paths.length) return { fotosSinBorrar: 0 };
+  const { error: storageError } = await supabase.storage
+    .from(CLAIMS_BUCKET)
+    .remove(paths);
+  return { fotosSinBorrar: storageError ? paths.length : 0 };
+}
+
 export async function fetchClaimComments(claimId) {
   if (isDemoMode()) {
     return readLocalComments(claimId);
@@ -479,7 +504,7 @@ export async function fetchClaimComments(claimId) {
 
   const { data, error } = await supabase
     .from(COMMENTS_TABLE_NAME)
-    .select("*, autor:usuario_id ( nombre, apellido, email )")
+    .select("*")
     .eq("reclamo_id", claimId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -503,7 +528,7 @@ export async function addClaimComment({ claimId, userId, comment, author }) {
   const { data, error } = await supabase
     .from(COMMENTS_TABLE_NAME)
     .insert({ reclamo_id: claimId, usuario_id: userId, comentario: comment })
-    .select("*, autor:usuario_id ( nombre, apellido, email )")
+    .select("*")
     .single();
   if (error) throw error;
   return data;

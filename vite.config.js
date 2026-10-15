@@ -4,14 +4,17 @@ import { defineConfig, loadEnv } from "vite";
 import tailwindcss from "@tailwindcss/vite";
 
 // Solo en el build: en desarrollo Vite inyecta scripts inline que la CSP bloquearía.
-function contentSecurityPolicy(supabaseUrl) {
+function contentSecurityPolicy(supabaseUrl, conCaptcha) {
   const supabase = new URL(supabaseUrl).origin;
+  // Turnstile (CAPTCHA) carga su script y un marco desde Cloudflare.
+  const cloudflare = conCaptcha ? " https://challenges.cloudflare.com" : "";
   const policy = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src 'self'${cloudflare}`,
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' data: blob: ${supabase}`,
-    `connect-src 'self' ${supabase} ${supabase.replace("https://", "wss://")}`,
+    `connect-src 'self' ${supabase} ${supabase.replace("https://", "wss://")}${cloudflare}`,
+    `frame-src${cloudflare || " 'none'"}`,
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
@@ -43,7 +46,11 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       babel({ presets: [reactCompilerPreset()] }),
-      env.VITE_SUPABASE_URL && contentSecurityPolicy(env.VITE_SUPABASE_URL),
+      env.VITE_SUPABASE_URL &&
+        contentSecurityPolicy(
+          env.VITE_SUPABASE_URL,
+          Boolean(env.VITE_TURNSTILE_SITE_KEY),
+        ),
     ],
   };
 });

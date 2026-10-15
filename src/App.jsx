@@ -53,6 +53,7 @@ const AdminEdificios = pantalla(() => import("./pages/AdminEdificios"));
 const AdminEdificioDetalle = pantalla(
   () => import("./pages/AdminEdificioDetalle"),
 );
+const Perfil = pantalla(() => import("./pages/Perfil"));
 const CrearCuenta = pantalla(() => import("./pages/CrearCuenta"));
 const ConfirmarCuenta = pantalla(() => import("./pages/ConfirmarCuenta"));
 const OlvideContrasena = pantalla(() => import("./pages/OlvideContrasena"));
@@ -111,6 +112,9 @@ function AppRoutes() {
       <Route path="/restablecer" component={RestablecerContrasena} />
       <Route path="/home">
         <ProtectedRoute component={Home} />
+      </Route>
+      <Route path="/perfil">
+        <ProtectedRoute component={Perfil} />
       </Route>
       <Route path="/reclamos">
         <ProtectedRoute component={Reclamos} />

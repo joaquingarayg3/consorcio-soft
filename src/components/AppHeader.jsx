@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
+import InfoUtil from "./InfoUtil";
 import { FranjaMarca, Isotipo } from "./Marca";
 import { NOMBRE_MARCA, SIGLAS } from "../utils/marca";
 import supabase from "../supabase-client";
@@ -29,8 +30,10 @@ export default function AppHeader({ backTo }) {
   const [notifications, setNotifications] = useState([]);
   const [notificationHistory, setNotificationHistory] = useState([]);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const notificationsRef = useRef(null);
   const profileRef = useRef(null);
+  const infoRef = useRef(null);
   const [allClaims, setAllClaims] = useState([]);
   const [userAssignment, setUserAssignment] = useState(null);
   const ahora = useAhora();
@@ -138,20 +141,24 @@ export default function AppHeader({ backTo }) {
   // Con un menú abierto, tocar en cualquier otro lado (o apretar Escape) lo
   // cierra. Tocar dentro del propio menú o de su botón no lo cierra.
   useEffect(() => {
-    if (!notificationsOpen && !profileOpen) return;
+    if (!notificationsOpen && !profileOpen && !infoOpen) return;
 
     function alTocar(evento) {
-      const dentro = [notificationsRef.current, profileRef.current].some(
-        (contenedor) => contenedor?.contains(evento.target),
-      );
+      const dentro = [
+        notificationsRef.current,
+        profileRef.current,
+        infoRef.current,
+      ].some((contenedor) => contenedor?.contains(evento.target));
       if (dentro) return;
       setNotificationsOpen(false);
       setProfileOpen(false);
+      setInfoOpen(false);
     }
     function alApretarTecla(evento) {
       if (evento.key !== "Escape") return;
       setNotificationsOpen(false);
       setProfileOpen(false);
+      setInfoOpen(false);
     }
 
     document.addEventListener("pointerdown", alTocar);
@@ -160,7 +167,7 @@ export default function AppHeader({ backTo }) {
       document.removeEventListener("pointerdown", alTocar);
       document.removeEventListener("keydown", alApretarTecla);
     };
-  }, [notificationsOpen, profileOpen]);
+  }, [notificationsOpen, profileOpen, infoOpen]);
 
   function notificationTitle(claim) {
     return claim.titulo || claim.title || "Nuevo reclamo";
@@ -168,6 +175,7 @@ export default function AppHeader({ backTo }) {
 
   function handleNotificationsOpen() {
     setProfileOpen(false);
+    setInfoOpen(false);
     setNotificationsOpen((open) => !open);
   }
 
@@ -220,7 +228,7 @@ export default function AppHeader({ backTo }) {
 
   return (
     <header
-      className={`relative grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-stone-200 bg-white px-3 py-2.5 sm:px-6 sm:py-3 ${
+      className={`relative grid grid-cols-[1fr_auto_1fr] items-center gap-1 border-b border-stone-200 bg-white px-3 py-2.5 sm:gap-2 sm:px-6 sm:py-3 ${
         backTo ? "" : "sm:grid-cols-[1fr_auto]"
       }`}
     >
@@ -282,14 +290,26 @@ export default function AppHeader({ backTo }) {
         </span>
       </Link>
 
-      <div className="flex shrink-0 items-center gap-2 justify-self-end sm:gap-3">
+      <div className="flex shrink-0 items-center gap-1 justify-self-end sm:gap-3">
+        {/* Contactos e información útil del edificio: solo para vecinos */}
+        {perfil && perfil.rol !== "admin" && (
+          <InfoUtil
+            abierto={infoOpen}
+            contenedorRef={infoRef}
+            onAlternar={() => {
+              setNotificationsOpen(false);
+              setProfileOpen(false);
+              setInfoOpen((open) => !open);
+            }}
+          />
+        )}
         <div ref={notificationsRef} className="sm:relative">
           <button
             type="button"
             aria-label={`Notificaciones${totalNuevas ? `: ${totalNuevas} nuevas` : ""}`}
             aria-expanded={notificationsOpen}
             onClick={handleNotificationsOpen}
-            className="relative flex h-10 w-10 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 transition-colors hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 sm:h-10 sm:w-10"
           >
             <svg
               aria-hidden="true"
@@ -495,9 +515,10 @@ export default function AppHeader({ backTo }) {
             aria-expanded={profileOpen}
             onClick={() => {
               setNotificationsOpen(false);
+              setInfoOpen(false);
               setProfileOpen((open) => !open);
             }}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-700 text-sm font-semibold text-white transition-shadow hover:ring-2 hover:ring-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50 sm:h-9 sm:w-9"
           >
             {initial}
           </button>
@@ -574,10 +595,17 @@ export default function AppHeader({ backTo }) {
                 )}
               </div>
 
+              <Link
+                href="/perfil"
+                onClick={() => setProfileOpen(false)}
+                className="mt-4 block w-full rounded-lg bg-brand-700 px-3 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-brand-800 active:bg-brand-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/50"
+              >
+                Mi perfil
+              </Link>
               <button
                 type="button"
                 onClick={() => singOutUser()}
-                className="mt-4 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
+                className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100"
               >
                 Cerrar sesión
               </button>

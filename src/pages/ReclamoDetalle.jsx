@@ -9,11 +9,33 @@ import {
   fetchClaimComments,
   updateClaim,
 } from "../services/claims";
+import { autorDeComentario, autorDeReclamo } from "../utils/autores";
 import { mensajeDeError } from "../utils/supabase-errors";
 import { etiquetaReclamo } from "../utils/tickets";
 
 const inputClass =
   "w-full rounded-lg border border-stone-300 px-3 py-2.5 text-base text-stone-900 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/20 disabled:bg-stone-50";
+
+// Nombre de quien escribió o cargó algo, con su unidad o la marca de
+// administración al lado.
+function Autor({ autor }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="font-semibold text-stone-700">{autor.nombre}</span>
+      {autor.esAdmin && (
+        <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-800">
+          Administración
+        </span>
+      )}
+      {autor.unidad && (
+        <span className="rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+          {autor.unidad}
+        </span>
+      )}
+    </span>
+  );
+}
+
 const statusLabels = {
   abierto: "Activo",
   en_curso: "En curso",
@@ -190,12 +212,6 @@ export default function ReclamoDetalle() {
   const priority = claim?.prioridad || claim?.priority || "Media";
   const imageUrls = claim?.imagen_urls || claim?.image_urls || [];
   const hayCambios = draftStatus !== status || draftPriority !== priority;
-  const authorName = (commentItem) => {
-    const author = commentItem.autor || commentItem.author;
-    return author
-      ? `${author.nombre || ""} ${author.apellido || ""}`.trim() || author.email
-      : "Usuario";
-  };
 
   return (
     <div className="min-h-dvh bg-stone-50">
@@ -325,9 +341,8 @@ export default function ReclamoDetalle() {
                     <dt className="text-[10px] font-medium uppercase tracking-wide text-stone-400">
                       Reportante
                     </dt>
-                    <dd className="mt-1 font-medium text-stone-700">
-                      {claim.reportante?.nombre || "Residente"}{" "}
-                      {claim.reportante?.apellido || ""}
+                    <dd className="mt-1 text-sm font-medium text-stone-700">
+                      <Autor autor={autorDeReclamo(claim)} />
                     </dd>
                   </div>
                 </dl>
@@ -406,11 +421,9 @@ export default function ReclamoDetalle() {
                     key={commentItem.id}
                     className="rounded-xl bg-stone-50 p-3"
                   >
-                    <div className="flex justify-between gap-3 text-xs">
-                      <span className="font-semibold text-stone-700">
-                        {authorName(commentItem)}
-                      </span>
-                      <time className="text-stone-400">
+                    <div className="flex items-start justify-between gap-3 text-xs">
+                      <Autor autor={autorDeComentario(commentItem)} />
+                      <time className="shrink-0 text-stone-400">
                         {new Date(commentItem.created_at).toLocaleString(
                           "es-AR",
                         )}
@@ -443,6 +456,10 @@ export default function ReclamoDetalle() {
                   className={inputClass}
                   placeholder="Escribí una actualización o consulta"
                 />
+                <p className="mt-1.5 text-xs text-stone-500">
+                  Tu nombre y tu unidad se muestran junto a lo que escribís, y
+                  quedan registrados.
+                </p>
                 <button
                   type="submit"
                   disabled={saving || !comment.trim()}
